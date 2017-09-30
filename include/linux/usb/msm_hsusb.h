@@ -111,7 +111,7 @@ enum msm_usb_phy_type {
 
 #define IDEV_ACA_CHG_MAX	1500
 #define IDEV_ACA_CHG_LIMIT	500
-#define IDEV_HVDCP_CHG_MAX	1800
+#define IDEV_HVDCP_CHG_MAX	1500
 
 /**
  * Different states involved in USB charger detection.
@@ -500,6 +500,7 @@ struct msm_otg {
 	struct delayed_work chg_work;
 	struct delayed_work id_status_work;
 	struct delayed_work suspend_work;
+	struct delayed_work invalid_chg_work;
 	enum usb_chg_state chg_state;
 	enum usb_chg_type chg_type;
 	unsigned dcd_time;

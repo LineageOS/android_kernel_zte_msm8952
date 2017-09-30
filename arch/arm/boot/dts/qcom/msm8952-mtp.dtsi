@@ -13,7 +13,7 @@
 
 #include "msm8952.dtsi"
 #include "msm8952-pinctrl.dtsi"
-#include "msm8952-camera-sensor-mtp.dtsi"
+//#include "msm8952-camera-sensor-mtp.dtsi"
 
 &i2c_3 { /* BLSP1 QUP3 */
 	synaptics@20 {
@@ -40,6 +40,26 @@
 		synaptics,display-coords = <0 0 1079 1919>;
 		synaptics,panel-coords = <0 0 1079 2084>;
 	};
+	pn5xx@28{
+		compatible = "nxp,pn548";
+		reg = <0x28>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <25 0>;
+		nxp,pn5xx-irq = <&msm_gpio 25 0x00>;
+		nxp,pn5xx-ven = <&msm_gpio 69 0x00>;
+		nxp,pn5xx-fw-dwnld = <&msm_gpio 27 0x00>;
+		nxp,pn5xx-ese-pwr = <&msm_gpio 33 0x00>;
+		nxp,pn5xx-swp2-pwr = <&msm_gpio 129 0x00>;
+		nxp,int_active_low = <0>;
+		//nxp,pn5xx-clkreq = <&pm8950 2 0x00>;
+		//nxp,clk-src = "BBCLK2";
+		//interrupt-names = "nfc_irq";
+		pinctrl-names = "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_int_active &nfc_disable_active>;
+		pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
+		//clocks = <&clock_gcc clk_bb_clk2_pin>;
+		//clock-names = "bb_clk2";
+	};
 };
 
 &i2c_2 {
@@ -52,9 +72,43 @@
 		qcom,float-voltage-mv = <4250>;
 		qcom,recharge-mv = <100>;
 	};
+
+	pericom-type-c@3d {
+		compatible = "pericom,usb-type-c";
+		reg = <0x3d>;
+		vdd_io-supply = <&pm8950_l5>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <90 2>;    /* MSM GPIO 90, TRIGGER_FALLING */
+		pericom,enb-gpio = <&msm_gpio 91 0x00>;    /* active low ENB */
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbc_int_default>;
+	};
+
+	ti-type-c@61 {
+		compatible = "ti,usb-type-c";
+		reg = <0x61>;
+		vdd_io-supply = <&pm8950_l5>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <90 2>;    /* MSM GPIO 90, TRIGGER_FALLING */
+		ti,enb-gpio = <&msm_gpio 91 0x00>;    /* active low ENB */
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbc_int_default>;
+	};
+
+	fusb301-type-c@25 {
+		compatible = "fusb301,usb-type-c";
+		reg = <0x25>;
+		vdd_io-supply = <&pm8950_l5>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <90 2>;    /* MSM GPIO 90, TRIGGER_FALLING */
+		ti,enb-gpio = <&msm_gpio 91 0x00>;    /* active low ENB */
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbc_int_default>;
+	};
 };
 
-&i2c_5 { /* BLSP2 QUP1 */
+#if 0
+&i2c_5 {
 	nq@28 {
 		compatible = "qcom,nq-nci";
 		reg = <0x28>;
@@ -73,6 +127,7 @@
 		clock-names = "ref_clk";
 	};
 };
+#endif
 
 &soc {
 	gen-vkeys {
@@ -85,39 +140,7 @@
 		qcom,key-codes = <158 139 172 217>;
 	};
 
-	gpio_keys {
-		compatible = "gpio-keys";
-		input-name = "gpio-keys";
-		pinctrl-names = "tlmm_gpio_key_active","tlmm_gpio_key_suspend";
-		pinctrl-0 = <&gpio_key_active>;
-		pinctrl-1 = <&gpio_key_suspend>;
-
-		camera_focus {
-			label = "camera_focus";
-			gpios = <&msm_gpio 87 0x1>;
-			linux,input-type = <1>;
-			linux,code = <0x210>;
-			debounce-interval = <15>;
-		};
-
-		camera_snapshot {
-			label = "camera_snapshot";
-			gpios = <&msm_gpio 86 0x1>;
-			linux,input-type = <1>;
-			linux,code = <0x2fe>;
-			debounce-interval = <15>;
-		};
-
-		vol_up {
-			label = "volume_up";
-			gpios = <&msm_gpio 85 0x1>;
-			linux,input-type = <1>;
-			linux,code = <115>;
-			debounce-interval = <15>;
-		};
-	};
-
-	 sound {
+	sound {
 		compatible = "qcom,msm8952-audio-codec";
 		qcom,model = "msm8952-snd-card-mtp";
 		reg = <0xc051000 0x4>,
@@ -164,7 +187,7 @@
 		pinctrl-1 = <&cdc_pdm_lines_act &cdc_pdm_lines_2_act &cross_conn_det_sus>;
 		pinctrl-2 = <&cdc_pdm_lines_sus &cdc_pdm_lines_2_sus &cross_conn_det_act>;
 		pinctrl-3 = <&cdc_pdm_lines_act &cdc_pdm_lines_2_act &cross_conn_det_act>;
-		qcom,cdc-us-euro-gpios = <&msm_gpio 63 0>;
+		/* qcom,cdc-us-euro-gpios = <&msm_gpio 63 0>; */
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
 				<&afe>, <&lsm>, <&routing>, <&lpa>,
@@ -279,6 +302,21 @@
 			reg = <0x45>;
 		};
 	};
+
+	qcom_gx_fp {
+		compatible = "qcom,gx_fp";
+		/* reg = <0>; */
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <31 0x1>;
+		goodix,gpio_irq = <&msm_gpio 31 0x1>;
+		goodix,gpio_reset = <&msm_gpio 32 0>;
+		goodix,gpio_pwr = <&msm_gpio 13 0>;
+		goodix,fp_id = <&msm_gpio 47 0>;
+		pinctrl-names = "fp_id_default", "fp_id_sleep";
+		pinctrl-0 = <&fp_id0_default>;
+		pinctrl-1 = <&fp_id0_sleep>;
+		qcom,use-pinctrl;
+	};
 };
 
 &pm8950_gpios {
@@ -314,8 +352,8 @@
 
 &pmi8950_charger {
 	qcom,battery-data = <&mtp_batterydata>;
-	qcom,chg-led-support;
-	qcom,chg-led-sw-controls;
+	/* qcom,chg-led-support;
+	qcom,chg-led-sw-controls; */
 };
 
 &spmi_bus {
@@ -392,7 +430,7 @@
 			1 &intc 0 221 0
 			2 &msm_gpio 67 0>;
 	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
-	cd-gpios = <&msm_gpio 67 0x1>;
+	cd-gpios = <&msm_gpio 67 0x0>;
 
 	status = "ok";
 };
@@ -408,8 +446,9 @@
 };
 
 &pmx_mdss {
-	qcom,num-grp-pins = <3>;
-	qcom,pins = <&gp 90>, <&gp 0>, <&gp 91>;
+	qcom,num-grp-pins = <1>;
+	qcom,pins = <&gp 0>;
+
 };
 
 &pmx_mdss_te {
@@ -421,11 +460,10 @@
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
-	qcom,dsi-pref-prim-pan = <&dsi_truly_1080_vid>;
+	qcom,dsi-pref-prim-pan = <&dsi_boe_jd9366_boe_8p0_800P_video_vid &dsi_xingyuan_rm68200_auo_8p0_800P_video_vid
+		 &dsi_xingyuan_rm72013_auo_8p0_800P_video_vid>;
 
-	qcom,platform-enable-gpio = <&msm_gpio 90 0>;
 	qcom,platform-reset-gpio = <&msm_gpio 0 0>;
-	qcom,platform-bklight-en-gpio = <&msm_gpio 91 0>;
 };
 
 &dsi_truly_1080_cmd {

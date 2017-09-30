@@ -464,7 +464,9 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 				    struct persistent_ram_ecc_info *ecc_info)
 {
 	int ret;
-
+#ifdef CONFIG_ZTE_RAM_CONSOLE
+	bool have_old_log = false;
+#endif
 	ret = persistent_ram_init_ecc(prz, ecc_info);
 	if (ret)
 		return ret;
@@ -482,6 +484,9 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 				" size %zu, start %zu\n",
 			       buffer_size(prz), buffer_start(prz));
 			persistent_ram_save_old(prz);
+#ifdef CONFIG_ZTE_RAM_CONSOLE
+			have_old_log = true;
+#endif
 			return 0;
 		}
 	} else {
@@ -490,8 +495,13 @@ static int persistent_ram_post_init(struct persistent_ram_zone *prz, u32 sig,
 	}
 
 	prz->buffer->sig = sig;
-	persistent_ram_zap(prz);
-
+#ifdef CONFIG_ZTE_RAM_CONSOLE
+	if (!have_old_log) {
+#endif
+		persistent_ram_zap(prz);
+#ifdef CONFIG_ZTE_RAM_CONSOLE
+	}
+#endif
 	return 0;
 }
 

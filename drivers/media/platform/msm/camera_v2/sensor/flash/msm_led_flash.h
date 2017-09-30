@@ -30,7 +30,11 @@ struct msm_flash_fn_t {
 	int32_t (*flash_led_init)(struct msm_led_flash_ctrl_t *);
 	int32_t (*flash_led_release)(struct msm_led_flash_ctrl_t *);
 	int32_t (*flash_led_off)(struct msm_led_flash_ctrl_t *);
+#ifdef CONFIG_BOARD_TULIP
+	int32_t (*flash_led_low)(struct msm_led_flash_ctrl_t *, struct msm_flash_cfg_data_t *);/*added by lijianjun*/
+#else
 	int32_t (*flash_led_low)(struct msm_led_flash_ctrl_t *);
+#endif
 	int32_t (*flash_led_high)(struct msm_led_flash_ctrl_t *);
 };
 
@@ -68,6 +72,9 @@ struct msm_led_flash_ctrl_t {
 	enum cci_i2c_master_t cci_i2c_master;
 	enum msm_camera_led_config_t led_state;
 	uint32_t subdev_id;
+#ifdef CONFIG_BOARD_TULIP
+	struct camera_vreg_t  cam_vreg;
+#endif
 	struct msm_pinctrl_info pinctrl_info;
 };
 

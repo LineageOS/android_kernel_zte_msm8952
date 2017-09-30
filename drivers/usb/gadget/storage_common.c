@@ -95,7 +95,12 @@
 
 /* Length of a SCSI Command Data Block */
 #define MAX_COMMAND_SIZE	16
-
+/*SCSI Command for OS X*/
+#define SC_GET_CONFIGRATION    0x46
+/* xbl_20110801 start_stop usb debug*/
+#define SC_START_STOP_USB_DEBUG  0x86
+#define SC_SET_CD_SPEED          0xbb
+/*end*/
 /* SCSI Sense Key/Additional Sense Code/ASC Qualifier values */
 #define SS_NO_SENSE				0
 #define SS_COMMUNICATION_FAILURE		0x040800

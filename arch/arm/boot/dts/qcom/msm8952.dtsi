@@ -63,7 +63,13 @@
 			reg = <0x0 0x85b00000 0x0 0xd00000>;
 			label = "other_ext_mem";
 		};
-
+		tzapp_mem: tzapp_region@0 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0 0x8DD00000 0 0x1900000>;
+			label = "tzapp_mem";
+		};
 		venus_mem: venus_region@0 {
 			linux,reserve-contiguous-region;
 			linux,memory-limit = <0x90000000>;
@@ -94,6 +100,14 @@
                         linux,reserve-contiguous-region;
                         reg = <0 0 0 0x400000>;
                         label = "adsp_mem";
+                };
+
+                ramoops_men: ramoops_region@9fd00000 {
+                        linux,reserve-contiguous-region;
+                        linux,reserve-region;
+                        linux,remove-completely;
+                        reg = <0 0x9fd00000 0 0x200000>;
+                        label = "ramoops_mem";
                 };
 	};
 
@@ -754,9 +768,9 @@
 		qcom,msm-bus,num-cases = <3>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
-		<90 512 0 0>,              /* No vote (ab=0 Mbps, ib=0 Mbps – NO BIMC vote) */
-		<90 512 100000 800000>,    /* SVS  - (ab=100Mbps, ib=800Mbps – 50MHz BIMC freq) */
-		<90 512 100000 1200000>;   /* PERF - (ab=100Mbps, ib=1200Mbps – 75MHz BIMC freq) */
+		<90 512 0 0>,              /* No vote (ab=0 Mbps, ib=0 Mbps ?NO BIMC vote) */
+		<90 512 100000 800000>,    /* SVS  - (ab=100Mbps, ib=800Mbps ?50MHz BIMC freq) */
+		<90 512 100000 1200000>;   /* PERF - (ab=100Mbps, ib=1200Mbps ?75MHz BIMC freq) */
 		qcom,bus-vector-names = "MIN", "SVS", "PERF";
 		qcom,tethered-flow-control;
 	};
@@ -871,6 +885,31 @@
 		mem_dump_table@10 {
 			compatible = "qcom,msm-imem-mem_dump_table";
 			reg = <0x10 8>;
+		};
+
+		sd_dump_mode@74 {
+			compatible = "qcom,msm-imem-sd_dump_mode";
+			reg = <0x74 4>;
+		};
+
+		vlog_memory_cookie@B0 {
+			compatible = "qcom,msm-imem-vlog_memory_cookie";
+			reg = <0xB0 4>;
+		};
+
+		vlog_memory_addr@B4 {
+			compatible = "qcom,msm-imem-vlog_memory_addr";
+			reg = <0xB4 4>;
+		};
+
+		vlog_memory_size@B8 {
+			compatible = "qcom,msm-imem-vlog_memory_size";
+			reg = <0xB8 4>;
+		};
+
+		zte_sw_ver@bc {
+			compatible = "qcom,msm-imem-zte_sw_ver";
+			reg = <0xbc 4>;
 		};
 
 		restart_reason@65c {
@@ -1599,9 +1638,9 @@
 		qcom,ce-opp-freq = <100000000>;
 	};
 
-	qcom_seecom: qseecom@85b00000 {
+	qcom_seecom: qseecom@8DD00000 {
 		compatible = "qcom,qseecom";
-		reg = <0x85b00000 0x800000>;
+		reg = <0x8DD00000 0x1900000>;
 		reg-names = "secapp-region";
 		qcom,hlos-num-ce-hw-instances = <1>;
 		qcom,hlos-ce-hw-instance = <0>;

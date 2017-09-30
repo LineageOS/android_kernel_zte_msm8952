@@ -48,13 +48,82 @@ int32_t msm_led_i2c_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 {
 	int rc = 0;
 	int i = 0;
+#ifdef CONFIG_BOARD_TULIP
+	struct msm_flash_cfg_data_t *cfg2 = (struct msm_flash_cfg_data_t *)data;
+#else
 	struct msm_camera_led_cfg_t *cfg = (struct msm_camera_led_cfg_t *)data;
 	CDBG("called led_state %d\n", cfg->cfgtype);
-
+#endif
 	if (!fctrl->func_tbl) {
 		pr_err("failed\n");
 		return -EINVAL;
 	}
+#ifdef CONFIG_BOARD_TULIP
+	CDBG("flash %s,%d", __func__, __LINE__);
+	switch (cfg2->cfg_type) {
+	case CFG_FLASH_INIT:
+		CDBG("flash %s,%d", __func__, __LINE__);
+		if (fctrl->func_tbl->flash_led_init)
+			rc = fctrl->func_tbl->flash_led_init(fctrl);
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			cfg2->flash_current[i] =
+				fctrl->flash_max_current[i];
+			cfg2->flash_duration[i] =
+				fctrl->flash_max_duration[i];
+			cfg2->torch_current[i] =
+				fctrl->torch_max_current[i];
+		}
+		CDBG("flash %s,%d", __func__, __LINE__);
+	break;
+
+	case CFG_FLASH_RELEASE:
+		if (fctrl->func_tbl->flash_led_release)
+			rc = fctrl->func_tbl->
+				flash_led_release(fctrl);
+		break;
+
+	case CFG_FLASH_OFF:
+		if (fctrl->func_tbl->flash_led_off)
+			rc = fctrl->func_tbl->flash_led_off(fctrl);
+		break;
+
+	case CFG_FLASH_LOW:
+		CDBG("flash %s,%d", __func__, __LINE__);
+		for (i = 0; i < fctrl->torch_num_sources; i++) {
+			if (fctrl->torch_max_current[i] > 0) {
+				fctrl->torch_op_current[i] =
+					(cfg2->torch_current[i] < fctrl->torch_max_current[i]) ?
+						cfg2->torch_current[i] : fctrl->torch_max_current[i];
+				CDBG("torch source%d: op_current %d max_current %d\n",
+					i, fctrl->torch_op_current[i], fctrl->torch_max_current[i]);
+			}
+		}
+		CDBG("flash %s,%d", __func__, __LINE__);
+		if (fctrl->func_tbl->flash_led_low)
+			rc = fctrl->func_tbl->flash_led_low(fctrl, cfg2);
+		break;
+
+	case CFG_FLASH_HIGH:
+		CDBG("flash %s,%d", __func__, __LINE__);
+		for (i = 0; i < fctrl->flash_num_sources; i++) {
+			if (fctrl->flash_max_current[i] > 0) {
+				fctrl->flash_op_current[i] =
+					(cfg2->flash_current[i] < fctrl->flash_max_current[i]) ?
+						cfg2->flash_current[i] : fctrl->flash_max_current[i];
+				CDBG("flash source%d: op_current %d max_current %d\n",
+					i, fctrl->flash_op_current[i], fctrl->flash_max_current[i]);
+			}
+		}
+		CDBG("flash %s,%d", __func__, __LINE__);
+		if (fctrl->func_tbl->flash_led_high)
+			rc = fctrl->func_tbl->flash_led_high(fctrl);
+		break;
+	default:
+		CDBG("flash %s,%d", __func__, __LINE__);
+		rc = -EFAULT;
+		break;
+	}
+#else
 	switch (cfg->cfgtype) {
 
 	case MSM_CAMERA_LED_INIT:
@@ -112,6 +181,7 @@ int32_t msm_led_i2c_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 		rc = -EFAULT;
 		break;
 	}
+#endif
 	CDBG("flash_set_led_state: return %d\n", rc);
 	return rc;
 }
@@ -708,7 +778,11 @@ static void msm_led_i2c_torch_brightness_set(struct led_classdev *led_cdev,
 		if (fctrl->func_tbl->flash_led_init)
 			fctrl->func_tbl->flash_led_init(fctrl);
 		if (fctrl->func_tbl->flash_led_low)
+		#ifdef CONFIG_BOARD_TULIP
+			fctrl->func_tbl->flash_led_low(fctrl, NULL);/*modify by lijianjun*/
+		#else
 			fctrl->func_tbl->flash_led_low(fctrl);
+		#endif
 	} else {
 		if (fctrl->func_tbl->flash_led_off)
 			fctrl->func_tbl->flash_led_off(fctrl);

@@ -29,3 +29,5 @@ obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 obj-$(CONFIG_INPUT_KEYCOMBO)	+= keycombo.o
 obj-$(CONFIG_SENSORS_HALL)	+= hall_sensor.o
 
+obj-$(CONFIG_ZTE_INPUT_MISC) += ztemisc/
+obj-$(CONFIG_FINGERPRINT_GOODIX_GF3118M) += fingerprint/gf3118m_driver/

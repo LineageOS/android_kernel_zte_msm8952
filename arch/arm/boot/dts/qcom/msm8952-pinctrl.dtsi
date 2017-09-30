@@ -83,11 +83,12 @@
 			label = "cross-conn-det-sw";
 			cross_conn_det_act: lines_on {
 				drive-strength = <8>;
-				output-low;
+				output-high;
 				bias-pull-down;
 			};
 			cross_conn_det_sus: lines_off {
 				drive-strength = <2>;
+				output-low;
 				bias-pull-down;
 			};
 		};
@@ -148,7 +149,7 @@
 			label = "cd-gpio";
 			sdc2_cd_on: cd_on {
 				drive-strength = <2>;
-				bias-pull-up;
+				bias-disable;
 			};
 			sdc2_cd_off: cd_off {
 				drive-strength = <2>;
@@ -328,6 +329,79 @@
 				bias-disable = <0>;
 			};
 		};
+		fp_id0_default {
+			qcom,pins = <&gp 47>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "fp-id0-default";
+			fp_id0_default: fp_id0_default{
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+		fp_id0_sleep {
+			qcom,pins = <&gp 47>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "fp-id0-sleep";
+			fp_id0_sleep: fp_id0_sleep{
+				drive-strength = <2>;
+				bias-pull-up;
+			};
+		};
+/* ZTE_MODIFY add for audio by lvrongguo begin */
+		spi5_active {
+			/* MOSI, MISO, CLK */
+			qcom,pins = <&gp 16>, <&gp 17>, <&gp 19>;
+			qcom,num-grp-pins = <3>;
+			qcom,pin-func = <1>;
+			label = "spi5-active";
+			/* active state */
+			spi5_default: spi5_default {
+				drive-strength = <12>; /* 12 MA */
+				bias-disable = <0>; /* No PULL */
+			};
+		};
+
+		spi5_suspend {
+			/* MOSI, MISO, CLK */
+			qcom,pins = <&gp 16>, <&gp 17>, <&gp 19>;
+			qcom,num-grp-pins = <3>;
+			qcom,pin-func = <0>;
+			label = "spi5-suspend";
+			/* suspended state */
+			spi5_sleep: spi5_sleep {
+				drive-strength = <2>; /* 2 MA */
+				bias-pull-down; /* PULL Down */
+			};
+		};
+
+		spi5_cs0_active {
+			/* CS */
+			qcom,pins = <&gp 18>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <1>;
+			label = "spi5-cs0-active";
+			spi5_cs0_active: cs0_active {
+				drive-strength = <2>;
+				bias-disable = <0>;
+			};
+		};
+
+		spi5_cs0_suspend {
+			/* CS */
+			qcom,pins = <&gp 18>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "spi5-cs0-suspend";
+			spi5_cs0_sleep: cs0_sleep {
+				drive-strength = <2>;
+				bias-disable = <0>;
+			};
+		};
+
+/* ZTE_MODIFY add for audio by lvrongguo end */
+
 		/* cci */
 		cci0_active {
 			/* CLK, DATA */
@@ -355,7 +429,7 @@
 			};
 		};
 
-		cci1_active {
+		cci1_active_nouse {
 			/* CLK, DATA */
 			qcom,pins = <&gp 31>, <&gp 32>;
 			qcom,num-grp-pins = <2>;
@@ -368,7 +442,7 @@
 			};
 		};
 
-		cci1_suspend {
+		cci1_suspend_nouse {
 			/* CLK, DATA */
 			qcom,pins = <&gp 31>, <&gp 32>;
 			qcom,num-grp-pins = <2>;
@@ -728,8 +802,8 @@
 
 		cam_sensor_rear_default {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 36>, <&gp 35>;
-			qcom,num-grp-pins = <2>;
+			qcom,pins = <&gp 36>, <&gp 35>,  <&gp 63>, <&gp 60>;
+			qcom,num-grp-pins = <4>;
 			label = "cam_sensor_rear_default";
 			/* active state */
 			cam_sensor_rear_default: cam_sensor_rear_default {
@@ -740,8 +814,8 @@
 
 		cam_sensor_rear_sleep {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 36>, <&gp 35>;
-			qcom,num-grp-pins = <2>;
+			qcom,pins = <&gp 36>, <&gp 35>,  <&gp 63>, <&gp 60>;
+			qcom,num-grp-pins = <4>;
 			label = "cam_sensor_rear_sleep";
 			/*suspended state */
 			cam_sensor_rear_sleep: cam_sensor_rear_sleep {
@@ -803,7 +877,7 @@
 
 		cam_sensor_front_default {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 38>, <&gp 37>;
+			//qcom,pins = <&gp 38>, <&gp 38>;//zte-modify by zuojianfang for hall sensor
 			qcom,num-grp-pins = <2>;
 			label = "cam_sensor_front_default";
 			/* active state */
@@ -815,7 +889,7 @@
 
 		cam_sensor_front_sleep {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 38>, <&gp 37>;
+			//qcom,pins = <&gp 38>, <&gp 38>;//zte-modify by zuojianfang for hall sensor
 			qcom,num-grp-pins = <2>;
 			label = "cam_sensor_front_sleep";
 			/*suspended state */
@@ -849,10 +923,27 @@
 				bias-pull-down; /* PULL DOWN */
 			};
 		};
+		cam_sensor_flash {
+				//FLSH_RESET,FLASH_EN,FLASH_NOW
+				qcom,pins = <&gp 128>, <&gp 34>,<&gp 37> ;
+				qcom,num-grp-pins = <3>;
+				qcom,pin-func = <0>;
+				label = "cam_sensor_flash";
+				// active state
+				cam_sensor_flash_default: default {
+					drive-strength = <2>; // 2 MA
+					bias-disable = <0>; // No PULL
+				};
+				//suspended state
+				cam_sensor_flash_sleep: sleep {
+					drive-strength = <2>;// //2 MA
+					bias-pull-down = <0>; // PULL DOWN
+				};
+			};
 
 		cam_sensor_front1_default {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 40>, <&gp 39>;
+			qcom,pins = <&gp 40>, <&gp 60>;//, <&gp 39>;
 			qcom,num-grp-pins = <2>;
 			label = "cam_sensor_front1_default";
 			/* active state */
@@ -864,7 +955,7 @@
 
 		cam_sensor_front1_sleep {
 			/* RESET, STANDBY */
-			qcom,pins = <&gp 40>, <&gp 39>;
+			qcom,pins = <&gp 40>, <&gp 60>;//, <&gp 39>;
 			qcom,num-grp-pins = <2>;
 			label = "cam_sensor_front1_sleep";
 			/*suspended state */
@@ -1449,21 +1540,6 @@
 			};
 		};
 
-		tlmm_gpio_key {
-			qcom,pins = <&gp 85>, <&gp 86>, <&gp 87>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <3>;
-			label = "tlmm_gpio_key";
-			gpio_key_active: gpio_key_active {
-				drive-strength = <2>;
-				bias-pull-up;
-			};
-			gpio_key_suspend: gpio_key_suspend {
-				drive-strength = <2>;
-				bias-pull-up;
-			};
-		};
-
 		usb_c_intn_pin {
 			qcom,pins = <&gp 93>, <&gp 133>;
 			qcom,num-grp-pins = <2>;
@@ -1474,5 +1550,40 @@
 				bias-pull-up;		/* PULL UP*/
 			};
 		};
+
+		sx9500_int_pin {
+			qcom,pins = <&gp 17>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "sx9500_int_pin";
+			sx9500_int_active: sx9500_int_active {
+				drive-strength = <2>;	/* 2 mA */
+				bias-disable; /* No PULL */
+				input-enable; /* input */
+			};
+			sx9500_int_sleep: sx9500_int_sleep {
+				drive-strength = <2>;	/* 2 mA */
+				bias-disable; /* No PULL */
+				input-enable; /* input */
+			};
+		};
+
+		sx9500_txen {
+			qcom,pins = <&gp 16>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "sx9500_txen_high";
+			sx9500_txen_active: sx9500_txen_active {
+				drive-strength = <2>;	/* 2 mA */
+				bias-disable; /* No PULL */
+				output-high;
+			};
+			sx9500_txen_sleep: sx9500_txen_sleep {
+				drive-strength = <2>;	/* 2 mA */
+				bias-disable; /* No PULL */
+				output-low;
+			};
+		};
+
 	};
 };

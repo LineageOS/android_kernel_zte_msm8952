@@ -28,7 +28,10 @@
 #include <linux/irqchip/qpnp-int.h>
 #include <linux/ipc_logging.h>
 #include "spmi-dbgfs.h"
-
+/*ZTE begin*/
+#include <linux/rtc.h>
+#include <linux/syscore_ops.h>
+/*ZTE end*/
 #define SPMI_PMIC_ARB_NAME		"spmi_pmic_arb"
 
 /* PMIC Arbiter configuration registers */
@@ -977,6 +980,16 @@ static int pmic_arb_pic_disable(struct spmi_controller *ctrl,
 	return 0;
 }
 
+/*ZTE begin*/
+#define	ZTE_MAX_QPNP_IRQ_SPEC 20
+struct zte_qpnp_irq_spec {
+	struct qpnp_irq_spec spec;
+	u8	trig;
+};
+struct zte_qpnp_irq_spec	zte_qpnp_irq_specs[ZTE_MAX_QPNP_IRQ_SPEC];
+struct timespec zte_qpnp_irq_ts;
+/*ZTE end*/
+
 static irqreturn_t
 periph_interrupt(struct spmi_pmic_arb_dev *pmic_arb, u8 apid, bool show)
 {
@@ -986,6 +999,7 @@ periph_interrupt(struct spmi_pmic_arb_dev *pmic_arb, u8 apid, bool show)
 	u8 pid = ppid & 0xFF;
 	u32 status;
 	int i;
+	int index	=	0;		/*ZTE*/
 
 	if (!is_apid_valid(pmic_arb, apid)) {
 		dev_err(pmic_arb->dev,
@@ -1031,6 +1045,15 @@ periph_interrupt(struct spmi_pmic_arb_dev *pmic_arb, u8 apid, bool show)
 			else
 				qpnpint_handle_irq(&pmic_arb->controller,
 								&irq_spec);
+			/*ZTE begin*/
+			if (index < ZTE_MAX_QPNP_IRQ_SPEC) {
+				zte_qpnp_irq_specs[index].spec.slave = sid;
+				zte_qpnp_irq_specs[index].spec.per = pid;
+				zte_qpnp_irq_specs[index].spec.irq = i;
+				zte_qpnp_irq_specs[index].trig = 1;
+				index++;
+			}
+			/*ZTE end*/
 		}
 	}
 	return IRQ_HANDLED;
@@ -1054,6 +1077,11 @@ __pmic_arb_periph_irq(int irq, void *dev_id, bool show)
 
 
 	dev_dbg(pmic_arb->dev, "Peripheral interrupt detected\n");
+
+/*ZTE begin*/
+	memset(zte_qpnp_irq_specs, 0, sizeof(zte_qpnp_irq_specs));
+	zte_qpnp_irq_ts = current_kernel_time();
+/*ZTE end*/
 
 	/* Check the accumulated interrupt status */
 	for (i = first; i <= last; ++i) {
@@ -1097,6 +1125,71 @@ __pmic_arb_periph_irq(int irq, void *dev_id, bool show)
 
 	return ret;
 }
+
+/*ZTE begin*/
+struct spmi_pmic_arb_dev *zte_pmic_arb	=	NULL;
+extern int qpnpint_get_irq(struct spmi_controller *spmi_ctrl, struct qpnp_irq_spec *spec);
+extern void print_irq_info(int i);
+
+void zte_pmic_irq_resume(void)
+{
+	struct spmi_pmic_arb_dev *pmic_arb = zte_pmic_arb;
+	void __iomem *intr = pmic_arb->intr;
+	u8 ee = pmic_arb->ee;
+	u32 status;
+
+	int first = pmic_arb->min_intr_apid >> 5;
+	int last = pmic_arb->max_intr_apid >> 5;
+	int i, j;
+
+	u16 ppid;
+	u8 sid;
+	u8 pid;
+	u32 status1;
+	int k;
+
+    /* Check the accumulated interrupt status */
+	for (i = first; i <= last; ++i) {
+		status = readl_relaxed(pmic_arb->intr +
+		pmic_arb->ver->owner_acc_status(ee, i));
+
+		for (j = 0; status && j < 32; ++j, status >>= 1) {
+			if (status & 0x1) {
+				u8 id = (i * 32) + j;
+
+				ppid = get_peripheral_id(pmic_arb, id);
+
+				if (!is_apid_valid(pmic_arb, id)) {
+					dev_err(pmic_arb->dev, "unknown peripheral id 0x%x\n", ppid);
+				}
+				sid = (ppid >> 8) & 0x0F;
+				pid = ppid & 0xFF;
+				status1 = readl_relaxed(intr + pmic_arb->ver->irq_status(id));
+				for (k = 0; status1 && k < 8; ++k, status1 >>= 1) {
+					if (status1 & 0x1) {
+						int irq = 0;
+						struct qpnp_irq_spec irq_spec = {
+							.slave = sid,
+							.per = pid,
+							.irq = k,
+						};
+						irq = qpnpint_get_irq(&pmic_arb->controller, &irq_spec);
+						dev_dbg(pmic_arb->dev,
+						"zte_pmic_irq_resume sid: 0x%x ,pid: 0x%x, irq: 0x%x\n",
+						sid, pid, k);
+						print_irq_info(irq);
+						}
+				}
+			}
+		}
+	}
+}
+
+static struct syscore_ops zte_pmic_syscore_ops = {
+	.suspend = NULL,
+	.resume = zte_pmic_irq_resume,
+};
+/*ZTE end*/
 
 static irqreturn_t pmic_arb_periph_irq(int irq, void *dev_id)
 {
@@ -1441,7 +1534,10 @@ static int spmi_pmic_arb_probe(struct platform_device *pdev)
 
 	the_pmic_arb = pmic_arb;
 	register_syscore_ops(&spmi_pmic_arb_syscore_ops);
-
+	/*ZTE begin*/
+	zte_pmic_arb	=	pmic_arb;
+	register_syscore_ops(&zte_pmic_syscore_ops);
+	/*ZTE end*/
 	return 0;
 
 err_reg_controller:

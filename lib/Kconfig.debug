@@ -1487,7 +1487,7 @@ config BUILD_DOCSRC
 
 config DYNAMIC_DEBUG
 	bool "Enable dynamic printk() support"
-	default n
+	default y
 	depends on PRINTK
 	depends on DEBUG_FS
 	help

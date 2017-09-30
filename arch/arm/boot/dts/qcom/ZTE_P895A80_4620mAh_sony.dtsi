@@ -1,0 +1,49 @@
+
+qcom,ZTE_P895A80_4620mAh_sony {
+	/* #2364201_ZTE_P895A80_4620mAh_averaged_MasterSlave_Mar28th2016*/
+	qcom,max-voltage-uv = <4350000>;
+	qcom,nom-batt-capacity-mah = <4620>;
+	qcom,batt-id-kohm = <240>;
+	qcom,battery-beta = <4050>;
+	qcom,battery-type = "ZTE_BATTERY_DATA_ID_1";
+	qcom,chg-rslow-comp-c1 = <2299366>;
+	qcom,chg-rslow-comp-c2 = <1988566>;
+	qcom,chg-rs-to-rslow = <883675>;
+	qcom,chg-rslow-comp-thr = <0x99>;
+	qcom,checksum = <0xF8ED>;
+	qcom,gui-version = "PMI8950GUI - 2.0.0.15";
+	qcom,fg-profile-data = [
+		E2 83 98 7C
+		B2 80 8F 76
+		56 83 B3 6C
+		20 88 7D 8E
+		E7 81 AE 99
+		97 B7 E8 C2
+		5D 13 EB 83
+		A2 7C B5 80
+		8E 76 4A 83
+		A2 68 02 80
+		50 8C 0E 82
+		34 9A 7D BD
+		33 CB 59 0E
+		41 12 28 59
+		CE 6E 6A FC
+		FB 35 8E 3D
+		DE 2B 00 00
+		2B 0F A4 31
+		92 45 00 00
+		00 00 00 00
+		00 00 00 00
+		02 70 3E 6A
+		24 77 FB 78
+		D1 77 74 6A
+		52 6F 78 7B
+		AE 77 5A 6A
+		87 9B CF C7
+		08 C1 52 53
+		45 A0 71 0C
+		28 00 FF 36
+		F0 11 30 03
+		00 00 00 0C
+	];
+};

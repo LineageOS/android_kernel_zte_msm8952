@@ -1,0 +1,10 @@
+#
+# vlog driver
+#
+config VENDOR_VLOG
+  bool "Modem Vlog Driver"
+  default n
+  help
+  This driver allow modem to output log into the data file of ap
+  It read the log from reserved memory from ap, and notify app
+  process to write the log to logfile

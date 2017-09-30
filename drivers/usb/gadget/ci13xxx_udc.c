@@ -66,6 +66,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
+#include <linux/switch.h>
 #include <linux/usb/msm_hsusb.h>
 #include <linux/tracepoint.h>
 #include <linux/qcom/usb_trace.h>
@@ -3610,6 +3611,72 @@ static const struct usb_ep_ops usb_ep_ops = {
 	.fifo_flush    = ep_fifo_flush,
 };
 
+/*notify open/close adbd uevent*/
+static ssize_t udc_print_switch_name(struct switch_dev *sdev, char *buf)
+{
+	return snprintf(buf, strlen(buf), "%s\n", "usb_scsi_command");
+}
+
+static ssize_t udc_print_switch_state(struct switch_dev *sdev, char *buf)
+{
+	return snprintf(buf, strlen(buf), "%d\n", sdev->state);
+}
+
+static void udc_uevent(struct switch_dev *sdev, int state)
+{
+	/*struct ci13xxx *udc = container_of(data, struct ci13xxx, event_work);*/
+	char *online[2] = { "USB_STATE=ONLINE", NULL };
+	char *offline[2] = { "USB_STATE=OFFLINE", NULL };
+	char **uevent_envp = NULL;
+
+	/*switch_set_state(&sdev, state);*/
+
+	uevent_envp = state ? online : offline;
+
+	if (uevent_envp) {
+		kobject_uevent_env(&sdev->dev->kobj, KOBJ_CHANGE, uevent_envp);
+		pr_info("%s: sent uevent %s\n", __func__, uevent_envp[0]);
+	}
+}
+int scsicmd_start_adbd(void)
+{
+	struct ci13xxx *udc = _udc;
+
+	if (udc == NULL)
+		return -EPERM;
+	udc->start_adbd = 1;
+	switch_set_state(&udc->scsi_sdev, 1);
+	pr_info("usb_xbl: %s, %d  %d\n", __func__, __LINE__, udc->start_adbd);
+	return 0;
+}
+EXPORT_SYMBOL(scsicmd_start_adbd);
+
+int scsicmd_stop_adbd(void)
+{
+	struct ci13xxx *udc = _udc;
+
+	if (udc == NULL)
+		return -EPERM;
+	udc->start_adbd = 0;
+	switch_set_state(&udc->scsi_sdev, 2);
+	pr_info("usb_xbl: %s, %d  %d\n", __func__, __LINE__, udc->start_adbd);
+	return 0;
+}
+
+static void scsicmd_usbstate_offline(struct work_struct *w)
+{
+	struct ci13xxx *udc = container_of(w, struct ci13xxx, scsi_work);
+
+	if (udc == NULL)
+		return;
+
+	if (udc->start_adbd == 1) {
+		pr_info("usb_xbl: %s, %d  %d\n", __func__, __LINE__, udc->start_adbd);
+		switch_set_state(&udc->scsi_sdev, 0);
+	}
+	udc->start_adbd = 0;
+}
+/*end*/
 /******************************************************************************
  * GADGET block
  *****************************************************************************/
@@ -3644,7 +3711,11 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
 				udc->udc_driver->notify_event(udc,
 					CI13XXX_CONTROLLER_DISCONNECT_EVENT);
 			pm_runtime_put_sync(&_gadget->dev);
+			/*xbl_20121128*/
+			schedule_work(&udc->scsi_work);
+			/*end*/
 		}
+		udc_uevent(&udc->scsi_sdev, is_active);
 	}
 
 	return 0;
@@ -4093,6 +4164,15 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
 			goto put_transceiver;
 	}
 
+    /*xbl-20121128*/
+	udc->scsi_sdev.name = "usb_scsi_command";
+	udc->scsi_sdev.print_name = udc_print_switch_name;
+	udc->scsi_sdev.print_state = udc_print_switch_state;
+	retval = switch_dev_register(&udc->scsi_sdev);
+	if (retval)
+		goto put_transceiver;
+	INIT_WORK(&udc->scsi_work, scsicmd_usbstate_offline);
+
 	if (udc->transceiver) {
 		retval = otg_set_peripheral(udc->transceiver->otg,
 						&udc->gadget);
@@ -4131,6 +4211,7 @@ remove_trans:
 put_transceiver:
 	if (udc->transceiver)
 		usb_put_phy(udc->transceiver);
+	switch_dev_unregister(&udc->scsi_sdev);
 destroy_eps:
 	destroy_eps(udc);
 free_dma_pools:

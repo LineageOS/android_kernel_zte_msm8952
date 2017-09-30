@@ -23,6 +23,11 @@
 #include <linux/syscore_ops.h>
 #include "pinctrl-msm.h"
 
+/*ZTE_PM ++++  GPIO*/
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <linux/slab.h>
+/*ZTE_PM ----  GPIO*/
 /* config translations */
 #define drv_str_to_rval(drv)	((drv >> 1) - 1)
 #define rval_to_drv_str(val)	((val + 1) << 1)
@@ -167,6 +172,44 @@
 #define TLMMV4_QDSD_CONFIG_WIDTH		0x5
 #define TLMMV4_QDSD_DRV_MASK			0x7
 
+/*ZTE_PM ++++ notes: print which GPIO wakeup system */
+#define GPIO_SNP_SIZE 100
+#include <linux/syscore_ops.h>
+#include <linux/workqueue.h>
+#define NE_GPIO_TO_SHOW 5
+static bool need_to_show_gpio = false;
+static int index_show_int = 0;
+static int irq_pin_to_show[NE_GPIO_TO_SHOW] = {0, 0, 0, 0, 0};
+static void show_gpio_interrupts_by_work(struct work_struct *work);
+static DECLARE_DELAYED_WORK(show_gpio_interrupts, show_gpio_interrupts_by_work);
+
+static void show_gpio_interrupts_by_work(struct work_struct *work)
+{
+	struct irq_desc *desc;
+	const char *name = "null";
+	int i = 0;
+
+	for (i = 0; i < NE_GPIO_TO_SHOW; i++) {
+		if (irq_pin_to_show[i] != 0) {
+			desc = irq_to_desc(irq_pin_to_show[i]);
+			if (desc == NULL)
+				name = "stray irq";
+			else if (desc->action && desc->action->name)
+				name = desc->action->name;
+
+			pr_debug("%s:ZTE_PM_IRQ %d triggered %s\n", __func__, irq_pin_to_show[i], name);
+
+			{
+				extern void print_irq_info(int i);
+				print_irq_info(irq_pin_to_show[i]);
+			}
+			irq_pin_to_show[i] = 0;
+			index_show_int = 0;
+		}
+	}
+	need_to_show_gpio = false;
+}
+/*ZTE_PM ----*/
 struct msm_sdc_regs {
 	unsigned long pull_mask;
 	unsigned long pull_shft;
@@ -957,9 +1000,33 @@ static void msm_tlmm_gp_irq_resume(void)
 	int num_irqs = ic->num_irqs;
 
 	spin_lock_irqsave(&ic->irq_lock, irq_flags);
-	for_each_set_bit(i, ic->wake_irqs, num_irqs)
+	for_each_set_bit(i, ic->wake_irqs, num_irqs) {
 		msm_tlmm_set_intr_cfg_enable(ic, i, 0);
+	/*ZTE_PM ++++  */
+		if (msm_tlmm_get_intr_status(ic, i)) {
+			struct irq_desc *desc;
+			const char *name = "null";
+			unsigned int virq = 0;
+			struct msm_pintype_info *pinfo = ic_to_pintype(ic);
+			struct gpio_chip *gc = pintype_get_gc(pinfo);
 
+			virq = msm_tlmm_gp_to_irq(gc, i);
+			if (!virq) {
+				dev_dbg(ic->dev, "invalid virq\n");
+			}
+			desc = irq_to_desc(virq);
+			if (desc == NULL)
+				name = "stray irq";
+			else if (desc->action && desc->action->name)
+				name = desc->action->name;
+			pr_debug("%s: %d triggered %s\n", __func__, virq, name);
+			{
+				extern void print_irq_info(int i);
+				print_irq_info(virq);
+			}
+		}
+	}
+	/*ZTE_PM ----  */
 	for_each_set_bit(i, ic->enabled_irqs, num_irqs)
 		msm_tlmm_set_intr_cfg_enable(ic, i, 1);
 	mb();
@@ -1154,6 +1221,486 @@ static const struct of_device_id msm_tlmm_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, msm_tlmm_dt_match);
 
+/*ZTE_PM ++++  GPIO*/
+#ifndef ZTE_GPIO_DEBUG
+#define ZTE_GPIO_DEBUG
+#endif
+
+#ifdef ZTE_GPIO_DEBUG
+
+static int msm_tlmm_gp_cfg_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	void __iomem *cfg_reg = TLMM_GP_CFG(pinfo, pin_no);
+
+	return readl_relaxed(cfg_reg);
+}
+
+static int msm_tlmm_gp_fn_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	unsigned int val;
+	void __iomem *cfg_reg = TLMM_GP_CFG(pinfo, pin_no);
+
+	val = readl_relaxed(cfg_reg);
+	val >>= TLMM_GP_FUNC_SHFT;
+	val &= TLMM_GP_FUNC_MASK;
+	return val;
+}
+
+static int msm_tlmm_gp_in_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	void __iomem *inout_reg = TLMM_GP_INOUT(pinfo, pin_no);
+
+	return readl_relaxed(inout_reg) & BIT(GPIO_IN_BIT);
+}
+
+static int msm_tlmm_gp_out_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	void __iomem *inout_reg = TLMM_GP_INOUT(pinfo, pin_no);
+
+	return (readl_relaxed(inout_reg) & BIT(GPIO_OUT_BIT)) > GPIO_OUT_BIT;
+}
+
+static int msm_tlmm_gp_dir_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	unsigned int val;
+	void __iomem *cfg_reg = TLMM_GP_CFG(pinfo, pin_no);
+
+	val = readl_relaxed(cfg_reg);
+	val >>= GPIO_OE_BIT;
+	val	&= 0x1;
+	return val;
+}
+
+static int msm_tlmm_gp_dir_set(uint pin_no, const struct msm_pintype_info *pinfo, u64 value)
+{
+	unsigned int val;
+	void __iomem *cfg_reg = TLMM_GP_CFG(pinfo, pin_no);
+
+	val = readl_relaxed(cfg_reg);
+	if (value)
+		val |= BIT(GPIO_OE_BIT);
+	else
+		val &= ~BIT(GPIO_OE_BIT);
+	writel_relaxed(val, cfg_reg);
+	return 0;
+}
+
+static int msm_tlmm_set_intr_cfg_get(uint pin_no, const struct msm_pintype_info *pinfo)
+{
+	unsigned int val;
+	void __iomem *cfg_reg = TLMM_GP_INTR_CFG(pinfo, pin_no);
+
+	val = readl_relaxed(cfg_reg);
+	return val;
+}
+
+static int gpio_debug_direction_set(void *data, u64 val)
+{
+	int *id = data;
+
+	msm_tlmm_gp_dir_set(*id, tlmm_pininfo, val);
+	return 0;
+}
+
+static int gpio_debug_direction_get(void *data, u64 *val)
+{
+	int *id = data;
+	*val = msm_tlmm_gp_dir_get(*id, tlmm_pininfo);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_direction_fops, gpio_debug_direction_get, gpio_debug_direction_set, "%llu\n");
+
+static int gpio_debug_level_set(void *data, u64 val)
+{
+	int *id = data;
+
+	msm_tlmm_gp_set(pintype_get_gc(tlmm_pininfo), *id, val);
+
+	return 0;
+}
+
+static int gpio_debug_level_get(void *data, u64 *val)
+{
+	int *id = data;
+	int dir = msm_tlmm_gp_dir_get(*id, tlmm_pininfo);
+
+	if (dir)
+		*val = msm_tlmm_gp_out_get(*id, tlmm_pininfo);
+	else
+		*val = msm_tlmm_gp_in_get(*id, tlmm_pininfo);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_level_fops, gpio_debug_level_get,
+				gpio_debug_level_set, "%llu\n");
+
+static int gpio_debug_drv_set(void *data, u64 val)
+{
+	int *id = data;
+	unsigned int reg_val;
+	int drv_reg;
+	void __iomem *cfg_reg = TLMM_GP_CFG(tlmm_pininfo, *id);
+
+	reg_val = readl_relaxed(cfg_reg);
+	drv_reg = val;
+	if (drv_reg > 7)
+		drv_reg	=	7;
+	reg_val &= ~(TLMM_GP_DRV_MASK << TLMM_GP_DRV_SHFT);
+	reg_val |= drv_reg << TLMM_GP_DRV_SHFT;
+
+	writel_relaxed(reg_val, cfg_reg);
+	return 0;
+}
+
+static int gpio_debug_drv_get(void *data, u64 *val)
+{
+	int *id = data;
+	unsigned int reg_val;
+	int drv_reg;
+	void __iomem *cfg_reg = TLMM_GP_CFG(tlmm_pininfo, *id);
+
+	reg_val = readl_relaxed(cfg_reg);
+	drv_reg = (reg_val >> TLMM_GP_DRV_SHFT) & TLMM_GP_DRV_MASK;
+	*val = drv_reg;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_drv_fops, gpio_debug_drv_get,
+				gpio_debug_drv_set, "%llu\n");
+
+static int gpio_debug_func_sel_set(void *data, u64 val)
+{
+	int *id = data;
+
+	msm_tlmm_gp_fn(*id, val, true,  tlmm_pininfo);
+	return 0;
+}
+
+static int gpio_debug_func_sel_get(void *data, u64 *val)
+{
+	int *id = data;
+
+	*val = msm_tlmm_gp_fn_get(*id, tlmm_pininfo);
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_func_sel_fops, gpio_debug_func_sel_get,
+				gpio_debug_func_sel_set, "%llu\n");
+
+static int gpio_debug_pull_set(void *data, u64 val)
+{
+	int *id = data;
+	unsigned int reg_val;
+
+	void __iomem *cfg_reg = TLMM_GP_CFG(tlmm_pininfo, *id);
+
+	reg_val = readl_relaxed(cfg_reg);
+	reg_val &= ~(TLMM_GP_PULL_MASK << TLMM_GP_PULL_SHFT);
+	reg_val |= val << TLMM_GP_PULL_SHFT;
+
+	writel_relaxed(reg_val, cfg_reg);
+	return 0;
+}
+
+static int gpio_debug_pull_get(void *data, u64 *val)
+{
+	int *id = data;
+	unsigned int reg_val;
+
+	void __iomem *cfg_reg = TLMM_GP_CFG(tlmm_pininfo, *id);
+
+	reg_val = readl_relaxed(cfg_reg);
+	*val = (reg_val >> TLMM_GP_PULL_SHFT) & TLMM_GP_PULL_MASK;
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_pull_fops, gpio_debug_pull_get,
+				gpio_debug_pull_set, "%llu\n");
+
+static int gpio_debug_int_enable_get(void *data, u64 *val)
+{
+	int *id = data;
+
+	*val = msm_tlmm_get_intr_cfg_enable(pintype_get_ic(tlmm_pininfo), *id);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_int_enable_fops, gpio_debug_int_enable_get,
+				NULL, "%llu\n");
+
+static int gpio_debug_int_owner_set(void *data, u64 val)
+{
+	int *id = data;
+	unsigned int reg_val;
+
+	void __iomem *cfg_reg = TLMM_GP_INTR_CFG(tlmm_pininfo, *id);
+
+	reg_val = readl_relaxed(cfg_reg);
+	reg_val &= ~(0x7 << INTR_TARGET_PROC_BIT);
+	reg_val |= val << INTR_TARGET_PROC_BIT;
+
+	writel_relaxed(val, cfg_reg);
+	return 0;
+}
+
+static int gpio_debug_int_owner_get(void *data, u64 *val)
+{
+	int *id = data;
+	int int_cfg;
+
+	int_cfg = msm_tlmm_set_intr_cfg_get(*id, tlmm_pininfo);
+	*val = (int_cfg >> INTR_TARGET_PROC_BIT) & 0x7;
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_int_owner_fops, gpio_debug_int_owner_get,
+			gpio_debug_int_owner_set, "%llu\n");
+
+static int gpio_debug_int_dect_get(void *data, u64 *val)
+{
+	int *id = data;
+	int int_cfg;
+
+	int_cfg = msm_tlmm_set_intr_cfg_get(*id, tlmm_pininfo);
+	*val = (int_cfg >> INTR_DECT_CTL_BIT) & 0x3;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(gpio_int_dect_fops, gpio_debug_int_dect_get,
+			NULL, "%llu\n");
+
+int msm_dump_gpios(struct seq_file *m, int curr_len, char *gpio_buffer);
+int pmic_dump_pins(struct seq_file *m, int curr_len, char *gpio_buffer);
+extern int print_gpio_buffer(struct seq_file *m);
+
+static int list_gpios_show(struct seq_file *m, void *unused)
+{
+	msm_dump_gpios(m, 0, NULL);
+	pmic_dump_pins(m, 0, NULL);
+	return 0;
+}
+
+static int list_sleep_gpios_show(struct seq_file *m, void *unused)
+{
+	print_gpio_buffer(m);
+	return 0;
+}
+
+static int list_gpios_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, list_gpios_show, inode->i_private);
+}
+
+static int list_sleep_gpios_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, list_sleep_gpios_show, inode->i_private);
+}
+
+static int list_sleep_gpios_release(struct inode *inode, struct file *file)
+{
+	/* free_gpio_buffer(); */
+	return single_release(inode, file);
+}
+
+static const struct file_operations list_gpios_fops = {
+	.open		= list_gpios_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static const struct file_operations list_sleep_gpios_fops = {
+	.open		= list_sleep_gpios_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= list_sleep_gpios_release,
+};
+
+static struct dentry *debugfs_base;
+#define DEBUG_MAX_FNAME	8
+
+static int gpio_add_status(int id)
+{
+	unsigned int *index_p;
+	struct dentry *gpio_dir;
+	char name[DEBUG_MAX_FNAME];
+
+	index_p = kzalloc(sizeof(*index_p), GFP_KERNEL);
+	*index_p = id;
+	snprintf(name, DEBUG_MAX_FNAME-1, "%d", *index_p);
+
+	gpio_dir = debugfs_create_dir(name, debugfs_base);
+	if (!gpio_dir)
+		return -ENOMEM;
+
+	if (!debugfs_create_file("direction", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_direction_fops))
+		goto error;
+
+	if (!debugfs_create_file("level", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_level_fops))
+		goto error;
+
+	if (!debugfs_create_file("drv_strength", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_drv_fops))
+		goto error;
+
+	if (!debugfs_create_file("func_sel", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_func_sel_fops))
+		goto error;
+
+	if (!debugfs_create_file("pull", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_pull_fops))
+		goto error;
+
+	if (!debugfs_create_file("int_enable", S_IRUGO, gpio_dir, index_p, &gpio_int_enable_fops))
+		goto error;
+
+	if (!debugfs_create_file("int_owner", S_IRUGO | S_IWUSR, gpio_dir, index_p, &gpio_int_owner_fops))
+		goto error;
+
+	if (!debugfs_create_file("int_dect_type", S_IRUGO, gpio_dir, index_p, &gpio_int_dect_fops))
+		goto error;
+
+	return 0;
+error:
+	debugfs_remove_recursive(gpio_dir);
+	return -ENOMEM;
+}
+
+int msm_dump_gpios(struct seq_file *m, int curr_len, char *gpio_buffer)
+{
+	unsigned int i, func_sel, dir, cfg, pull, drv, value, int_cfg, int_en, int_owner, len;
+	char list_gpio[100];
+	char *title_msg = "------------ MSM GPIO -------------";
+
+	struct msm_pintype_info *pinfo = &tlmm_pininfo[0];
+
+	if (m) {
+		seq_printf(m, "%s\n", title_msg);
+	} else {
+		pr_info("%s\n", title_msg);
+		curr_len += snprintf(gpio_buffer + curr_len, GPIO_SNP_SIZE,
+		"%s\n", title_msg);
+	}
+
+	for (i = 0; i < pinfo->num_pins; i++) {
+		if (i != 20 && i != 21 && i != 22 && i != 23) {
+			memset(list_gpio, 0, sizeof(list_gpio));
+			len = 0;
+
+			len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "GPIO[%3d]: ", i);
+
+			cfg = msm_tlmm_gp_cfg_get(i, pinfo);
+
+			func_sel	=	(cfg >> TLMM_GP_FUNC_SHFT) & TLMM_GP_FUNC_MASK;
+			len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[FS]0x%x, ", func_sel);
+
+			dir = (cfg >> GPIO_OE_BIT) & 0x1;
+			if (dir) {
+				value = msm_tlmm_gp_out_get(i, pinfo);
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE,
+				"[DIR]OUT, [VAL]%s ", value ? "HIGH" : " LOW");
+			} else {
+				value = msm_tlmm_gp_in_get(i, pinfo);
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE,
+				"[DIR] IN, [VAL]%s ", value ? "HIGH" : " LOW");
+			}
+
+			pull = (cfg >> TLMM_GP_PULL_SHFT) & TLMM_GP_PULL_MASK;
+			switch (pull) {
+			case 0x0:
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[PULL]NO, ");
+				break;
+			case 0x1:
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[PULL]PD, ");
+				break;
+			case 0x2:
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[PULL]KP, ");
+				break;
+			case 0x3:
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[PULL]PU, ");
+				break;
+			default:
+				break;
+			}
+
+			drv = (cfg >> TLMM_GP_DRV_SHFT) & TLMM_GP_DRV_MASK;
+			len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[DRV]%2dmA, ", 2*(drv+1));
+
+			if (!dir) {
+				int_cfg = msm_tlmm_set_intr_cfg_get(i, pinfo);
+				int_en = (int_cfg >>  INTR_ENABLE_BIT) & 0x1;
+				len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "[INT]%s, ", int_en ? "YES" : " NO");
+				if (int_en) {
+					int_owner = (int_cfg >> INTR_TARGET_PROC_BIT) & 0x7;
+					switch (int_owner) {
+					case 0x0:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "WCSS, ");
+						break;
+					case 0x1:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "SENSORS, ");
+						break;
+					case 0x2:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, " RESERVED, ");
+						break;
+					case 0x3:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "RPM_PROC, ");
+						break;
+					case 0x4:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, " APSS, ");
+						break;
+					case 0x5:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "MSS, ");
+						break;
+					case 0x6:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "TZ, ");
+						break;
+					case 0x7:
+						len += snprintf(list_gpio + len, GPIO_SNP_SIZE, "NONE, ");
+						break;
+					default:
+						break;
+					}
+					}
+				}
+
+				list_gpio[99] = '\0';
+				if (m) {
+					seq_printf(m, "%s\n", list_gpio);
+				} else {
+					pr_info("%s\n", list_gpio);
+					curr_len += snprintf(gpio_buffer +
+					curr_len, GPIO_SNP_SIZE, "%s\n", list_gpio);
+				}
+			}
+		}
+
+	return  curr_len;
+}
+EXPORT_SYMBOL(msm_dump_gpios);
+
+int gpio_status_debug_init(struct msm_pintype_info *pintype)
+{
+	int i;
+	int err = 0;
+
+	debugfs_base = debugfs_create_dir("zte_gpio", NULL);
+	if (!debugfs_base) {
+		return -ENOMEM;
+	}
+
+	if (!debugfs_create_file("dump_gpios", S_IRUGO, debugfs_base,
+				NULL, &list_gpios_fops))
+		return -ENOMEM;
+
+	if (!debugfs_create_file("dump_sleep_gpios", S_IRUGO, debugfs_base,
+				NULL, &list_sleep_gpios_fops))
+		return -ENOMEM;
+
+	for (i = 0; i < pintype->num_pins; i++)
+		err = gpio_add_status(i);
+
+	return err;
+}
+#else
+static void gpio_status_debug_init(struct msm_pintype_info *pintype) {}
+#endif
+/*ZTE_PM ----  GPIO*/
+
 static int msm_tlmm_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -1163,6 +1710,7 @@ static int msm_tlmm_probe(struct platform_device *pdev)
 	int i;
 	const struct msm_pintype_data **pintype_data;
 	struct device_node *node = pdev->dev.of_node;
+	int result;		/*zte_pm */
 
 	match = of_match_node(msm_tlmm_dt_match, node);
 	if (IS_ERR(match))
@@ -1202,7 +1750,11 @@ static int msm_tlmm_probe(struct platform_device *pdev)
 		tlmm_pininfo[i].pintype_data = pintype_data[i];
 	tlmm_desc->pintypes = tlmm_pininfo;
 	tlmm_desc->num_pintypes = ARRAY_SIZE(tlmm_pininfo);
-	return msm_pinctrl_probe(pdev, tlmm_desc);
+	/*ZTE_PM ++++  GPIO*/
+	result =  msm_pinctrl_probe(pdev, tlmm_desc);
+	gpio_status_debug_init(tlmm_pininfo);
+	return result;
+	/*ZTE_PM ----  GPIO*/
 }
 
 static struct platform_driver msm_tlmm_drv = {

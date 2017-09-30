@@ -102,6 +102,10 @@ obj-$(CONFIG_WCD9330_CODEC)	+= wcd9xxx-core.o wcd9xxx-irq.o wcd9xxx-slimslave.o\
 obj-$(CONFIG_WCD9335_CODEC)	+= wcd9xxx-core.o wcd9xxx-irq.o wcd9xxx-slimslave.o\
 						wcd9xxx-core-resource.o wcd9335-regmap.o\
                                                 wcd9335-tables.o wcd-gpio-ctrl.o
+
+obj-$(CONFIG_AK4962_CODEC)     += ak49xx-core.o ak49xx-irq.o\
+                                               ak49xx-slimslave.o ak49xx-core-resource.o
+
 obj-$(CONFIG_SND_SOC_MSM8X16_WCD)	+= wcd9xxx-core.o wcd9xxx-irq.o\
 						wcd9xxx-slimslave.o wcd9xxx-core-resource.o
 obj-$(CONFIG_SND_SOC_MSM8909_WCD)	+= wcd9xxx-core.o wcd9xxx-irq.o\

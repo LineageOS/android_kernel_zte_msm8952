@@ -37,6 +37,7 @@
 #include <asm/setup.h>
 #include <asm/sizes.h>
 #include <asm/tlb.h>
+#include <soc/qcom/vendor/sdlog_mem_reserve.h>
 
 #include "mm.h"
 
@@ -157,6 +158,8 @@ void __init arm64_memblock_init(void)
 	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
 
 	early_init_fdt_scan_reserved_mem();
+
+	sdlog_memory_reserve();
 
 	/* 4GB maximum for 32-bit only capable devices */
 	if (IS_ENABLED(CONFIG_ZONE_DMA))

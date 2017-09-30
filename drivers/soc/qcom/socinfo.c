@@ -544,6 +544,66 @@ static struct socinfo_v1 dummy_socinfo = {
 	.version = 1,
 };
 
+#ifdef CONFIG_ZTE_BOOT_MODE
+static int g_boot_mode = 0;
+
+void socinfo_set_boot_mode(int boot_mode)
+{
+	g_boot_mode = boot_mode;
+}
+
+int socinfo_get_ftm_flag(void)
+{
+	return g_boot_mode == ENUM_BOOT_MODE_FTM ? 1 : 0;
+}
+EXPORT_SYMBOL(socinfo_get_ftm_flag);
+
+int socinfo_get_recovery_flag(void)
+{
+	return g_boot_mode == ENUM_BOOT_MODE_RECOVERY ? 1 : 0;
+}
+EXPORT_SYMBOL(socinfo_get_recovery_flag);
+
+int socinfo_get_ffbm_flag(void)
+{
+	return g_boot_mode == ENUM_BOOT_MODE_FFBM ? 1 : 0;
+}
+EXPORT_SYMBOL(socinfo_get_ffbm_flag);
+#endif
+
+#if defined(CONFIG_BOARD_JASMINE)
+/*
+ * Support for marking sw version PV or Normal by ZTE_BOOT
+ */
+static const char *socinfo_zte_sw_ver = "INVALID";
+
+static ssize_t socinfo_show_zte_sw_ver(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", socinfo_zte_sw_ver);
+}
+
+/*
+ * Defined for op in '/sys/devices/soc0/zte_sw_ver'
+ */
+static struct device_attribute zte_sw_ver =
+	__ATTR(zte_sw_ver, S_IRUGO, socinfo_show_zte_sw_ver, NULL);
+
+void socinfo_sync_sysfs_zte_sw_ver(const char *sw_ver)
+{
+	if ((sw_ver == NULL) || (PAGE_SIZE < (strlen(sw_ver) + 1))) {
+		pr_err("%s: invalid length\n", __func__);
+		socinfo_zte_sw_ver = "INVALID";
+		return;
+	}
+
+	socinfo_zte_sw_ver = sw_ver;
+}
+EXPORT_SYMBOL(socinfo_sync_sysfs_zte_sw_ver);
+
+#endif
+
 uint32_t socinfo_get_id(void)
 {
 	return (socinfo) ? socinfo->v1.id : 0;
@@ -1121,6 +1181,9 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 	device_create_file(msm_soc_device, &image_variant);
 	device_create_file(msm_soc_device, &image_crm_version);
 	device_create_file(msm_soc_device, &select_image);
+#if defined(CONFIG_BOARD_JASMINE)
+	device_create_file(msm_soc_device, &zte_sw_ver);
+#endif
 
 	switch (legacy_format) {
 	case 10:

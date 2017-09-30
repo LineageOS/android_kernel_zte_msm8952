@@ -1,0 +1,49 @@
+
+qcom,zte_p852a10_4v4_2700mah {
+	/* #2342112_ZTE_P852A10_2700mAh_averaged_MasterSlave_Feb16th2016*/
+	qcom,max-voltage-uv = <4400000>;
+	qcom,nom-batt-capacity-mah = <2700>;
+	qcom,batt-id-kohm = <180>;
+	qcom,battery-beta = <3435>;
+	qcom,battery-type = "ZTE_BATTERY_DATA_ID_3";
+	qcom,chg-rslow-comp-c1 = <2493542>;
+	qcom,chg-rslow-comp-c2 = <2491450>;
+	qcom,chg-rs-to-rslow = <1260785>;
+	qcom,chg-rslow-comp-thr = <0x99>;
+	qcom,checksum = <0xD22F>;
+	qcom,gui-version = "PMI8950GUI - 2.0.0.15";
+	qcom,fg-profile-data = [
+		 6D 83 FE 67
+		 68 79 F5 6E
+		 5F 83 EC 6C
+		 F4 82 A5 8C
+		 0C 82 2F 99
+		 C7 B6 EA C1
+		 70 19 F8 83
+		 65 7D BA 81
+		 74 7C 71 83
+		 F5 75 AD 8A
+		 68 95 45 82
+		 88 98 11 B6
+		 73 C1 58 16
+		 A6 0A 83 5A
+		 14 70 71 FD
+		 E8 3D 38 46
+		 AF 41 00 00
+		 6D 46 5C 32
+		 5F 30 00 00
+		 00 00 00 00
+		 00 00 00 00
+		 63 71 71 70
+		 3A 52 F5 82
+		 4B 74 4C 61
+		 73 67 6D 78
+		 0D 6E EF 4B
+		 6B 85 34 C8
+		 0B 22 61 25
+		 5E A0 71 0C
+		 28 00 FF 36
+		 F0 11 30 03
+		 00 00 00 0C
+	];
+};

@@ -167,6 +167,7 @@ void lpm_suspend_wake_time(uint64_t wakeup_time)
 		suspend_wake_time = msm_pm_sleep_time_override;
 	else
 		suspend_wake_time = wakeup_time;
+	pr_info("ZTE_ALARM gonna sleep for %llu s, override: %d\n", suspend_wake_time, msm_pm_sleep_time_override);
 }
 EXPORT_SYMBOL(lpm_suspend_wake_time);
 
@@ -1326,6 +1327,11 @@ static void update_history(struct cpuidle_device *dev, int idx)
 		history->hptr = 0;
 }
 
+/*ZTE ++++*/
+extern bool zte_msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode, bool from_idle);
+extern void zte_pm_before_powercollapse(void);
+/*ZTE ----*/
+
 static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 		struct cpuidle_driver *drv, int index)
 {
@@ -1597,10 +1603,13 @@ static int lpm_suspend_enter(suspend_state_t state)
 	 */
 	clock_debug_print_enabled();
 
-	if (!use_psci)
+	if (!use_psci) {
+		zte_pm_before_powercollapse();/*ZTE add:suspend->PC*/
 		msm_cpu_pm_enter_sleep(cluster->cpu->levels[idx].mode, false);
-	else
+	} else {
+		zte_pm_before_powercollapse();/*ZTE add:suspend->PC*/
 		psci_enter_sleep(cluster, idx, true);
+	}
 
 	if (idx > 0)
 		update_debug_pc_event(CPU_EXIT, idx, true, 0xdeaffeed,

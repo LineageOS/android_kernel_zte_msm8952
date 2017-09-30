@@ -62,6 +62,9 @@ static uint8_t common_cmds[DIAG_NUM_COMMON_CMD] = {
 
 static uint8_t hdlc_timer_in_progress;
 
+void msm_ignore_sd_dump(int enable);
+
+
 /* Determine if this device uses a device tree */
 #ifdef CONFIG_OF
 static int has_device_tree(void)
@@ -932,6 +935,8 @@ int diag_process_apps_pkt(unsigned char *buf, int len)
 		msleep(5000);
 		/* call download API */
 		msm_set_restart_mode(RESTART_DLOAD);
+		/* ensure that do not enter into sd dump */
+		msm_ignore_sd_dump(1);
 		printk(KERN_CRIT "diag: download mode set, Rebooting SoC..\n");
 		kernel_restart(NULL);
 		/* Not required, represents that command isnt sent to modem */
@@ -1487,7 +1492,9 @@ int diagfwd_init(void)
 	for (i = 0; i < DIAG_NUM_PROC; i++)
 		driver->real_time_mode[i] = 1;
 	driver->supports_separate_cmdrsp = 1;
-	driver->supports_apps_hdlc_encoding = 1;
+	/*disable app hdlc support for sdlog*/
+	/*driver->supports_apps_hdlc_encoding = 1;*/
+	driver->supports_apps_hdlc_encoding = 0;
 	mutex_init(&driver->diag_hdlc_mutex);
 	mutex_init(&driver->diag_cntl_mutex);
 	mutex_init(&driver->mode_lock);

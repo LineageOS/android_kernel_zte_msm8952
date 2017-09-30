@@ -42,7 +42,7 @@
 				  SND_JACK_BTN_6 | SND_JACK_BTN_7)
 #define OCP_ATTEMPT 1
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
-#define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
+#define SPECIAL_HS_DETECT_TIME_MS (1 * 1000)
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
 #define GND_MIC_SWAP_THRESHOLD 4
 #define WCD_FAKE_REMOVAL_MIN_PERIOD_MS 100
@@ -71,6 +71,12 @@ enum wcd_mbhc_cs_mb_en_flag {
 static void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 				struct snd_soc_jack *jack, int status, int mask)
 {
+	/* ZTE_Audio_CJ,add log when press button or plug in headset*/
+	if (jack == &mbhc->headset_jack) {
+		pr_info("chenjun:%s:headset_jack status(%#X)\n", __func__, status);
+	} else if (jack == &mbhc->button_jack) {
+		pr_info("chenjun:%s:button_jack status(%#X)\n", __func__, status);
+	}
 	snd_soc_jack_report(jack, status, mask);
 }
 
@@ -650,13 +656,19 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		/* Report insertion */
 		if (jack_type == SND_JACK_HEADPHONE)
 			mbhc->current_plug = MBHC_PLUG_TYPE_HEADPHONE;
-		else if (jack_type == SND_JACK_UNSUPPORTED)
-			mbhc->current_plug = MBHC_PLUG_TYPE_GND_MIC_SWAP;
-		else if (jack_type == SND_JACK_HEADSET) {
+		else if (jack_type == SND_JACK_UNSUPPORTED){
+			mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
+			jack_type = SND_JACK_HEADSET;
+			pr_info("%s: SND_JACK_UNSUPPORTED Changing jack_type= %d   mbhc->hph_status = %x \n", __func__,
+				 jack_type, mbhc->hph_status);
+		} else if (jack_type == SND_JACK_HEADSET) {
 			mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
 			mbhc->jiffies_atreport = jiffies;
 		} else if (jack_type == SND_JACK_LINEOUT) {
-			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
+			mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
+			jack_type = SND_JACK_HEADSET;
+			pr_info("%s: SND_JACK_LINEOUT Changing jack_type= %d   mbhc->hph_status = %x \n", __func__,
+				 jack_type, mbhc->hph_status);
 		} else if (jack_type == SND_JACK_ANC_HEADPHONE)
 			mbhc->current_plug = MBHC_PLUG_TYPE_ANC_HEADPHONE;
 
@@ -670,8 +682,6 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				(mbhc->zr > mbhc->mbhc_cfg->linein_th &&
 				 mbhc->zr < MAX_IMPED) &&
 				(jack_type == SND_JACK_HEADPHONE)) {
-				jack_type = SND_JACK_LINEOUT;
-				mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
 				if (mbhc->hph_status) {
 					mbhc->hph_status &= ~(SND_JACK_HEADSET |
 							SND_JACK_LINEOUT |
@@ -1314,8 +1324,13 @@ correct_plug_type:
 		WCD_MBHC_REG_READ(WCD_MBHC_MIC_SCHMT_RESULT, mic_sch);
 		if (hs_comp_res && !(hphl_sch || mic_sch)) {
 			pr_debug("%s: cable is extension cable\n", __func__);
-			plug_type = MBHC_PLUG_TYPE_HIGH_HPH;
+			if (wcd_is_special_headset(mbhc)) {
+				pr_info("%s:get special headset,plug_type = %d\n",
+					__func__, plug_type);
+			}
+			plug_type = MBHC_PLUG_TYPE_HEADSET;
 			wrk_complete = true;
+			goto report;
 		} else {
 			pr_debug("%s: cable might be headset: %d\n", __func__,
 					plug_type);
@@ -1589,6 +1604,8 @@ static int wcd_mbhc_get_button_mask(struct wcd_mbhc *mbhc)
 	int btn;
 
 	btn = mbhc->mbhc_cb->map_btn_code_to_num(mbhc->codec);
+
+	if (btn > 3) return mask;
 
 	switch (btn) {
 	case 0:

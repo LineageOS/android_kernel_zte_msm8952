@@ -1263,6 +1263,8 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		host->data_start_time = ktime_get();
 	trace_mmc_cmd_rw_start(cmd->opcode, cmd->arg, cmd->flags);
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+	dev_dbg(&host->mmc->class_dev, "%s: op %02x arg %08x flags %08x\n",
+		mmc_hostname(host->mmc), cmd->opcode, cmd->arg, cmd->flags);
 }
 
 static void sdhci_finish_command(struct sdhci_host *host)
@@ -2142,6 +2144,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 
+	dev_dbg(&host->mmc->class_dev, "%s: ios->clock=%u, ios->timing=%d\n",
+		mmc_hostname(host->mmc), ios->clock, ios->timing);
 	if ((ios->timing == MMC_TIMING_SD_HS ||
 	     ios->timing == MMC_TIMING_MMC_HS)
 	    && !(host->quirks & SDHCI_QUIRK_NO_HISPD_BIT))

@@ -38,6 +38,7 @@
 #include <soc/qcom/smd.h>
 #include <soc/qcom/smsm.h>
 #include <soc/qcom/subsystem_restart.h>
+#include "../soc/qcom/smd_private.h"/*ZTE add*/
 
 #ifdef CONFIG_ARCH_FSM9XXX
 #define DEFAULT_NUM_SMD_PKT_PORTS 4
@@ -154,6 +155,40 @@ do { \
 		pr_info("Write: "x); \
 	SMD_PKT_LOG_STRING(x); \
 } while (0)
+
+
+
+/*ZTE ++++ notes: debug for SMD log*/
+#define SMD_PKT_LOG_BUF(buf, cnt) \
+	do { \
+		char log_buf[128]; \
+		int i; \
+		if (smd_pkt_ilctxt) { \
+			i = cnt < 16 ? cnt : 16; \
+			hex_dump_to_buffer(buf, i, 16, 1, log_buf, \
+					sizeof(log_buf), false); \
+			ipc_log_string(smd_pkt_ilctxt, "<SMD_PKT>: %s", log_buf); \
+		} \
+	} while (0)
+
+#define D_READ_DUMP_BUFFER(prestr, cnt, buf) \
+		do { \
+			if (msm_smd_pkt_debug_mask & SMD_PKT_READ_DUMP_BUFFER) \
+				print_hex_dump(KERN_INFO, prestr, \
+					DUMP_PREFIX_NONE, 16, 1, \
+					buf, cnt, 1); \
+			SMD_PKT_LOG_BUF(buf, cnt); \
+		} while (0)
+
+#define D_WRITE_DUMP_BUFFER(prestr, cnt, buf) \
+	do { \
+		if (msm_smd_pkt_debug_mask & SMD_PKT_WRITE_DUMP_BUFFER) \
+			print_hex_dump(KERN_INFO, prestr, \
+				DUMP_PREFIX_NONE, 16, 1, \
+				buf, cnt, 1); \
+		SMD_PKT_LOG_BUF(buf, cnt); \
+	} while (0)
+/*ZTE ----*/
 
 #define D_POLL(x...) \
 do { \
@@ -396,6 +431,13 @@ static long smd_pkt_ioctl(struct file *file, unsigned int cmd,
 	return ret;
 }
 
+/*ZTE ++++*/
+extern int zte_qmi_data_wakeup;
+extern int zte_qmi_state_change_wakeup;
+unsigned char is_qmi_channel(char *channel_name);
+extern int zte_smd_wakeup;
+/*ZTE ----*/
+
 ssize_t smd_pkt_read(struct file *file,
 		       char __user *_buf,
 		       size_t count,
@@ -407,6 +449,16 @@ ssize_t smd_pkt_read(struct file *file,
 	struct smd_pkt_dev *smd_pkt_devp;
 	unsigned long flags;
 	void *buf;
+
+	/*ZTE ++++*/
+	unsigned char i_f_type;
+	unsigned int length;
+	unsigned char service_id;
+	unsigned char client_id;
+	unsigned char ctrl_type;
+	unsigned int traction_id;
+	unsigned int message_id;
+	/*ZTE ----*/
 
 	smd_pkt_devp = file->private_data;
 
@@ -522,7 +574,53 @@ wait_for_packet:
 			return notify_reset(smd_pkt_devp);
 		}
 	} while (pkt_size != bytes_read);
+
+	/*ZTE ++++*/
+	if (zte_smd_wakeup) {
+		pr_info("SMD ch %u  data event ", smd_pkt_devp->ch->n);
+		pr_info("SMD ch %s data event ", &smd_pkt_devp->ch->name[0]);
+		zte_smd_wakeup = 0;
+	}
+	/*ZTE ----*/
+
 	mutex_unlock(&smd_pkt_devp->rx_lock);
+
+
+	/*ZTE ++++*/
+	/*
+	Control Channel Message:
+	type:	I/F type | Length| Control Flags| Service Type| Client ID| QMUX SDU|
+	QMUX Header:
+	size(byte): 1 | 2 | 1 | 1 | 1 |
+	QMUX SDU:
+	type: Control Flags| contraction id| message ID| length|
+	size(byte): 1 | 2 | 2| 2|
+	*/
+
+	/*
+	printk("QMI recev %d bytes\n",bytes_read);
+	printk("channel n=%d name=%s add=0x%p\n",smd_pkt_devp->ch->n,smd_pkt_devp->ch->name,buf);
+	 */
+
+	if (zte_qmi_data_wakeup && is_qmi_channel(smd_pkt_devp->ch->name)) {
+		if (bytes_read	> 15 && (buf != NULL)) {
+			char *buf_debug = (char *)buf;
+
+			i_f_type = *buf_debug;
+			length = (*(buf_debug+1) << 8) + *(buf_debug+2);
+			service_id = *(buf_debug + 4);
+			client_id = *(buf_debug + 5);
+			ctrl_type = *(buf_debug + 6);
+			traction_id = (*(buf_debug + 7) << 8) + *(buf_debug + 8);
+			message_id = (*(buf_debug + 10) << 8) + *(buf_debug + 9);
+			pr_info("ZTE_PM QMI recev: channel %s, I/F type:0x%x,service_id:0x%x, client_id: 0x%x\n",
+					smd_pkt_devp->ch->name, i_f_type, service_id, client_id);
+			pr_info("ZTE_PM QMI recev: ctrl_type:0x%x, traction_id:0x%x, message_id:0x%x\n",
+					ctrl_type, traction_id, message_id);
+		}
+		zte_qmi_data_wakeup = 0;
+	}
+	/*ZTE ----*/
 
 	mutex_lock(&smd_pkt_devp->ch_lock);
 	spin_lock_irqsave(&smd_pkt_devp->pa_spinlock, flags);
@@ -917,6 +1015,25 @@ static uint32_t smd_ch_edge[] = {
 	SMD_APPS_MODEM,
 };
 #endif
+
+/*ZTE ++++*/
+unsigned char is_qmi_channel(char *channel_name)
+{
+	unsigned char data_channel = 0;
+
+	if (strnstr(channel_name, "DATA", sizeof(channel_name))) {
+		data_channel = *(channel_name+4) - 0x30;
+		if (*(channel_name+6) == '_')
+			data_channel = data_channel*10 + (*(channel_name+5) - 0x30);
+
+		/*printk("channel name: %s, data channel %d\n", channel_name,data_channel);*/
+		if ((data_channel > 4 && data_channel < 10) || (data_channel > 11 && data_channel < 18)
+			|| (data_channel > 22 && data_channel < 32)	|| data_channel == 40)
+			return 1;
+	}
+	return 0;
+}
+/*ZTE ----*/
 
 static int smd_pkt_dummy_probe(struct platform_device *pdev)
 {

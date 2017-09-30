@@ -25,7 +25,8 @@
 	pinctrl-0 = <&uart_console_sleep>;
 };
 
-&i2c_5 { /* BLSP2 QUP1 */
+#if 0
+&i2c_5 {
 	nq@28 {
 		compatible = "qcom,nq-nci";
 		reg = <0x28>;
@@ -44,6 +45,7 @@
 		clock-names = "ref_clk";
 	};
 };
+#endif
 
 &pm8950_gpios {
 	gpio@c400 {

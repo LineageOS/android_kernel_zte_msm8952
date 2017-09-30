@@ -9,6 +9,7 @@
 #include <linux/blktrace_api.h>
 #include <asm/uaccess.h>
 
+extern int is_writeprotected(struct block_device *bdev);
 static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg __user *arg)
 {
 	struct block_device *bdevp;
@@ -278,6 +279,9 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 	struct backing_dev_info *bdi;
 	loff_t size;
 	int ret, n;
+	#if !defined(ZTE_FEATURE_TF_PARTIAL)
+	int wp_status = 0;
+	#endif
 
 	switch(cmd) {
 	case BLKFLSBUF:
@@ -300,6 +304,18 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 			return -EACCES;
 		if (get_user(n, (int __user *)(arg)))
 			return -EFAULT;
+		#if !defined(ZTE_FEATURE_TF_PARTIAL)
+		pr_info("%s, partno = %d, n = %d\n", __func__, bdev->bd_part->partno, n);
+		if (bdev->bd_part->info && bdev->bd_part->info->volname[0] &&
+			!strcmp(bdev->bd_part->info->volname, "system")) {
+			wp_status = is_writeprotected(bdev);
+			pr_info("%s, wp_status = %d\n", __func__, wp_status);
+			if (wp_status == 1) {
+				pr_info("%s, write protected is enabled, and return EPERM\n", __func__);
+				return -EPERM;
+			}
+		}
+		#endif
 		set_device_ro(bdev, n);
 		return 0;
 

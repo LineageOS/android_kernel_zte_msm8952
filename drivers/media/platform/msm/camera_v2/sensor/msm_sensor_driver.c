@@ -17,6 +17,12 @@
 #include "camera.h"
 #include "msm_cci.h"
 #include "msm_camera_dt_util.h"
+/*
+  * use  camera sensor engineering mode  interface
+  * use  test camera sensor mipi clock interface
+  * by ZTE_YCM_20140710 yi.changming 000006
+  */
+#include "zte_camera_sensor_util.h"
 
 /* Logging macro */
 #undef CDBG
@@ -985,6 +991,15 @@ CSID_TG:
 	s_ctrl->sensordata->cam_slave_info = slave_info;
 
 	msm_sensor_fill_sensor_info(s_ctrl, probed_info, entity_name);
+/*
+  * use  camera sensor engineering mode  interface
+  * use  test camera sensor mipi clock interface
+  * by ZTE_YCM_20140710 yi.changming 000006
+  */
+	if (msm_sensor_enable_debugfs(s_ctrl))
+		CDBG("%s:%d creat debugfs fail\n", __func__, __LINE__);
+
+	msm_sensor_register_sysdev(s_ctrl);
 
 	/*
 	 * Set probe succeeded flag to 1 so that no other camera shall

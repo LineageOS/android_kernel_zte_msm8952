@@ -16,7 +16,11 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
+#ifdef CONFIG_AK4962_CODEC
+#include "msm8952-ak4962.h"
+#else
 #include "msm8952-slimbus.h"
+#endif
 #include "qdsp6v2/msm-pcm-routing-v2.h"
 #include "../codecs/wcd9335.h"
 
@@ -39,12 +43,18 @@ static struct snd_soc_ops msm_pri_auxpcm_be_ops = {
 	.startup = msm_prim_auxpcm_startup,
 	.shutdown = msm_prim_auxpcm_shutdown,
 };
-
+/*TODO: DELETE BY ZTE*/
+/*
+static struct snd_soc_ops msm_sec_auxpcm_be_ops = {
+	.startup = msm_sec_auxpcm_startup,
+	.shutdown = msm_sec_auxpcm_shutdown,
+};
+*/
 static struct snd_soc_ops msm8952_slimbus_be_ops = {
 	.hw_params = msm_snd_hw_params,
 };
 
-
+#ifndef CONFIG_AK4962_CODEC
 static struct snd_soc_ops msm8952_cpe_ops = {
 	.hw_params = msm_snd_cpe_hw_params,
 };
@@ -52,7 +62,9 @@ static struct snd_soc_ops msm8952_cpe_ops = {
 static struct snd_soc_ops msm8952_slimbus_2_be_ops = {
 	.hw_params = msm8952_slimbus_2_hw_params,
 };
+#endif
 
+#ifndef CONFIG_AK4962_CODEC
 static struct snd_soc_dai_link msm8952_tasha_fe_dai[] = {
 	/* tasha_vifeedback for speaker protection */
 	{
@@ -255,8 +267,10 @@ static struct snd_soc_dai_link msm8952_tasha_be_dai[] = {
 		.ignore_suspend = 1,
 	},
 };
+#endif
 
 static struct snd_soc_dai_link msm8952_tomtom_fe_dai[] = {
+#ifndef CONFIG_AK4962_CODEC
 	{ /* hw:x,28 */
 		.name = LPASS_BE_SLIMBUS_4_TX,
 		.stream_name = "Slimbus4 Capture",
@@ -285,8 +299,9 @@ static struct snd_soc_dai_link msm8952_tomtom_fe_dai[] = {
 		.codec_name = "tomtom_codec",
 		.ops = &msm8952_cpe_ops,
 	},
+#endif
 };
-
+#ifndef CONFIG_AK4962_CODEC
 static struct snd_soc_dai_link msm8952_tomtom_be_dai[] = {
 	/* Backend DAI Links */
 	{
@@ -403,7 +418,124 @@ static struct snd_soc_dai_link msm8952_tomtom_be_dai[] = {
 		.ignore_suspend = 1,
 	},
 };
-
+#endif
+#ifdef CONFIG_AK4962_CODEC
+static struct snd_soc_dai_link msm8952_4962_dai[] = {
+	/* Backend DAI Links */
+	{
+		.name = LPASS_BE_SLIMBUS_0_RX,
+		.stream_name = "Slimbus Playback",
+		.cpu_dai_name = "msm-dai-q6-dev.16384",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_rx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_0_RX,
+		.init = &msm_audrx_init,
+		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
+		.ignore_pmdown_time = 1, /* dai link has playback support */
+		.ignore_suspend = 1,
+		.ops = &msm8952_slimbus_be_ops,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_0_TX,
+		.stream_name = "Slimbus Capture",
+		.cpu_dai_name = "msm-dai-q6-dev.16385",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_tx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_0_TX,
+		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
+		.ignore_suspend = 1,
+		.ops = &msm8952_slimbus_be_ops,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_1_RX,
+		.stream_name = "Slimbus1 Playback",
+		.cpu_dai_name = "msm-dai-q6-dev.16386",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_rx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_1_RX,
+		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		/* dai link has playback support */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_1_TX,
+		.stream_name = "Slimbus1 Capture",
+		.cpu_dai_name = "msm-dai-q6-dev.16387",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_tx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_1_TX,
+		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_3_RX,
+		.stream_name = "Slimbus3 Playback",
+		.cpu_dai_name = "msm-dai-q6-dev.16390",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_rx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_3_RX,
+		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		/* dai link has playback support */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_3_TX,
+		.stream_name = "Slimbus3 Capture",
+		.cpu_dai_name = "msm-dai-q6-dev.16391",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_tx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_3_TX,
+		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_4_RX,
+		.stream_name = "Slimbus4 Playback",
+		.cpu_dai_name = "msm-dai-q6-dev.16392",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_rx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_4_RX,
+		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		/* dai link has playback support */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_5_TX,
+		.stream_name = "Slimbus5 Capture",
+		.cpu_dai_name = "msm-dai-q6-dev.16395",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "ak4962_codec",
+		.codec_dai_name = "ak4962_tx1",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SLIMBUS_5_TX,
+		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
+		.ops = &msm8952_slimbus_be_ops,
+		.ignore_suspend = 1,
+	},
+};
+#endif
 static struct snd_soc_dai_link msm8952_common_fe_dai[] = {
 	/* FrontEnd DAI Links */
 	{/* hw:x,0 */
@@ -1000,6 +1132,37 @@ static struct snd_soc_dai_link msm8952_common_be_dai[] = {
 		.ops = &msm_pri_auxpcm_be_ops,
 		.ignore_suspend = 1,
 	},
+	/* Secondary AUX PCM Backend DAI Links */
+#ifndef CONFIG_AK4962_CODEC
+	{
+		.name = LPASS_BE_SEC_AUXPCM_RX,
+		.stream_name = "Sec AUX PCM Playback",
+		.cpu_dai_name = "msm-dai-q6-auxpcm.2",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-rx",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SEC_AUXPCM_RX,
+		.be_hw_params_fixup = msm_auxpcm_be_params_fixup,
+		/* .ops = &msm_sec_auxpcm_be_ops, */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		/* this dainlink has playback support */
+	},
+	{
+		.name = LPASS_BE_SEC_AUXPCM_TX,
+		.stream_name = "Sec AUX PCM Capture",
+		.cpu_dai_name = "msm-dai-q6-auxpcm.2",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "msm-stub-codec.1",
+		.codec_dai_name = "msm-stub-tx",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_SEC_AUXPCM_TX,
+		.be_hw_params_fixup = msm_auxpcm_be_params_fixup,
+		/* .ops = &msm_sec_auxpcm_be_ops, */
+		.ignore_suspend = 1,
+	},
+#endif
 	{
 		.name = LPASS_BE_QUAT_MI2S_TX,
 		.stream_name = "Quaternary MI2S Capture",
@@ -1183,6 +1346,7 @@ static struct snd_soc_codec_conf msm895x_codec_conf[] = {
 	},
 };
 
+#ifndef CONFIG_AK4962_CODEC
 static struct snd_soc_dai_link msm8952_tomtom_dai_links[
 ARRAY_SIZE(msm8952_common_fe_dai) +
 ARRAY_SIZE(msm8952_tomtom_fe_dai) +
@@ -1194,12 +1358,22 @@ ARRAY_SIZE(msm8952_common_fe_dai) +
 ARRAY_SIZE(msm8952_tasha_fe_dai) +
 ARRAY_SIZE(msm8952_common_be_dai) +
 ARRAY_SIZE(msm8952_tasha_be_dai)];
+#else
+static struct snd_soc_dai_link msm8952_ak4962_dai_links[
+	ARRAY_SIZE(msm8952_common_fe_dai) +
+	ARRAY_SIZE(msm8952_tomtom_fe_dai) +
+	ARRAY_SIZE(msm8952_common_be_dai) +
+	ARRAY_SIZE(msm8952_4962_dai)];
+#endif
 
 struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 {
 	struct snd_soc_card *card = &snd_soc_card_msm_card;
 	struct snd_soc_dai_link *msm8952_dai_links = NULL;
-	int num_links, ret, len1, len2, len3, i;
+	int num_links, ret, len1, len2, len3;
+#ifndef CONFIG_AK4962_CODEC
+	int i;
+
 	const char *wsa = "qcom,aux-codec";
 	const char *wsa_prefix = "qcom,aux-codec-prefix";
 	int num_strings;
@@ -1211,7 +1385,7 @@ struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	u32 *index = NULL;
 	u32 max_aux_dev = 0;
 	int found = 0;
-
+#endif
 	card->dev = dev;
 	ret = snd_soc_of_parse_card_name(card, "qcom,model");
 	if (ret) {
@@ -1220,6 +1394,7 @@ struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		return NULL;
 	}
 
+#ifndef CONFIG_AK4962_CODEC
 	if (!strcmp(card->name, "msm8952-tomtom-snd-card")) {
 		len1 = ARRAY_SIZE(msm8952_common_fe_dai);
 		len2 = len1 + ARRAY_SIZE(msm8952_tomtom_fe_dai);
@@ -1340,16 +1515,41 @@ struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 			temp_str = NULL;
 		}
 	}
+#endif
+#ifdef CONFIG_AK4962_CODEC
+	if (!strcmp(card->name, "msm8952-ak4962-snd-card")) {
+		pr_err("%s:  populate_snd_card_dailinks Entry!\n", __func__);
+		len1 = ARRAY_SIZE(msm8952_common_fe_dai);
+		len2 = len1 + ARRAY_SIZE(msm8952_tomtom_fe_dai);
+		len3 = len2 + ARRAY_SIZE(msm8952_common_be_dai);
+		snd_soc_card_msm[AK4962_CODEC].name = card->name;
+		card = &snd_soc_card_msm[AK4962_CODEC];
+		num_links = ARRAY_SIZE(msm8952_ak4962_dai_links);
+		memcpy(msm8952_ak4962_dai_links, msm8952_common_fe_dai,
+				sizeof(msm8952_common_fe_dai));
+		memcpy(msm8952_ak4962_dai_links + len1,
+			msm8952_tomtom_fe_dai, sizeof(msm8952_tomtom_fe_dai));
+		memcpy(msm8952_ak4962_dai_links + len2,
+			msm8952_common_be_dai, sizeof(msm8952_common_be_dai));
+		memcpy(msm8952_ak4962_dai_links + len3,
+			msm8952_4962_dai, sizeof(msm8952_4962_dai));
+		msm8952_dai_links = msm8952_ak4962_dai_links;
+	}
+#endif
+#ifndef CONFIG_AK4962_CODEC
 	card->aux_dev = msm895x_aux_dev;
 	card->codec_conf = msm895x_codec_conf;
+
 ret_card:
 	card->num_configs = max_aux_dev;
 	card->num_aux_devs = max_aux_dev;
+#endif
 	card->dai_link = msm8952_dai_links;
 	card->num_links = num_links;
 	card->dev = dev;
 
 	return card;
+#ifndef CONFIG_AK4962_CODEC
 err:
 	if (max_aux_dev > 0) {
 		for (i = 0; i < max_aux_dev; i++) {
@@ -1359,6 +1559,7 @@ err:
 		}
 	}
 	return NULL;
+#endif
 }
 
 void msm895x_free_auxdev_mem(struct platform_device *pdev)

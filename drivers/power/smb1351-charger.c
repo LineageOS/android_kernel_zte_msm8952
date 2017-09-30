@@ -537,17 +537,36 @@ static struct battery_status batt_s[] = {
 	[BATT_MISSING] = {0, 0, 0, 1, 0},
 };
 
+#define RETRY_COUNT 5
+int retry_sleep[RETRY_COUNT] = {
+	10, 20, 30, 40, 50
+};
+
+
 static int smb1351_read_reg(struct smb1351_charger *chip, int reg, u8 *val)
 {
 	s32 ret;
+	int retry_count = 0;
 
+	pm_stay_awake(chip->dev);
+
+retry:
 	ret = i2c_smbus_read_byte_data(chip->client, reg);
+
+	if (ret < 0 && retry_count < RETRY_COUNT) {
+		/* sleep for few ms before retrying */
+		msleep(retry_sleep[retry_count++]);
+		goto retry;
+	}
+
 	if (ret < 0) {
 		pr_err("i2c read fail: can't read from %02x: %d\n", reg, ret);
 		return ret;
 	} else {
 		*val = ret;
 	}
+
+	pm_relax(chip->dev);
 	pr_debug("Reading 0x%02x=0x%02x\n", reg, *val);
 	return 0;
 }
@@ -555,13 +574,25 @@ static int smb1351_read_reg(struct smb1351_charger *chip, int reg, u8 *val)
 static int smb1351_write_reg(struct smb1351_charger *chip, int reg, u8 val)
 {
 	s32 ret;
+	int retry_count = 0;
 
+	pm_stay_awake(chip->dev);
+
+retry:
 	ret = i2c_smbus_write_byte_data(chip->client, reg, val);
+	if (ret < 0 && retry_count < RETRY_COUNT) {
+		/* sleep for few ms before retrying */
+		msleep(retry_sleep[retry_count++]);
+		goto retry;
+	}
+
 	if (ret < 0) {
 		pr_err("i2c write fail: can't write %02x to %02x: %d\n",
 			val, reg, ret);
 		return ret;
 	}
+
+	pm_relax(chip->dev);
 	pr_debug("Writing 0x%02x=0x%02x\n", reg, val);
 	return 0;
 }
@@ -1162,7 +1193,7 @@ static int smb1351_set_usb_chg_current(struct smb1351_charger *chip,
 	int i, rc = 0;
 	u8 reg = 0, mask = 0;
 
-	pr_debug("USB current_ma = %d\n", current_ma);
+	pr_info("USB current_ma = %d\n", current_ma);
 
 	if (chip->chg_autonomous_mode) {
 		pr_debug("Charger in autonomous mode\n");
@@ -1172,7 +1203,7 @@ static int smb1351_set_usb_chg_current(struct smb1351_charger *chip,
 	/* set suspend bit when urrent_ma <= 2 */
 	if (current_ma <= SUSPEND_CURRENT_MA) {
 		smb1351_usb_suspend(chip, CURRENT, true);
-		pr_debug("USB suspend\n");
+		pr_info("USB suspend\n");
 		return 0;
 	}
 

@@ -106,17 +106,6 @@
 
 				qcom,pm-cluster-level@1{
 					reg = <1>;
-					label = "perf-l2-gdhs";
-					qcom,psci-mode = <2>;
-					qcom,latency-us = <267>;
-					qcom,ss-power = <435>;
-					qcom,energy-overhead = <388012>;
-					qcom,time-overhead = <627>;
-					qcom,min-child-idx = <1>;
-				};
-
-				qcom,pm-cluster-level@2{
-					reg = <2>;
 					label = "perf-l2-pc";
 					qcom,psci-mode = <3>;
 					qcom,latency-us = <305>;
@@ -181,17 +170,6 @@
 
 				qcom,pm-cluster-level@1{
 					reg = <1>;
-					label = "pwr-l2-gdhs";
-					qcom,psci-mode = <2>;
-					qcom,latency-us = <337>;
-					qcom,ss-power = <433>;
-					qcom,energy-overhead = <372429>;
-					qcom,time-overhead = <717>;
-					qcom,min-child-idx = <1>;
-				};
-
-				qcom,pm-cluster-level@2{
-					reg = <2>;
 					label = "pwr-l2-pc";
 					qcom,psci-mode = <3>;
 					qcom,latency-us = <415>;
@@ -373,6 +351,7 @@
 			<13  21>,
 			<14  54>,
 			<15  34>,
+			<16  31>,
 			<17  58>,
 			<18  28>,
 			<19  42>,

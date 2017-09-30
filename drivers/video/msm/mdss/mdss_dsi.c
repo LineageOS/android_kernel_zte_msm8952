@@ -291,6 +291,9 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_err("%s: failed to disable vregs for %s\n",
 			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
 
+    #ifdef CONFIG_BOARD_TULIP
+	mdss_dsi_panel_power_enable(pdata, 0);
+    #endif
 end:
 	return ret;
 }
@@ -307,6 +310,10 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
+
+    #ifdef CONFIG_BOARD_TULIP
+	mdss_dsi_panel_power_enable(pdata, 1);
+    #endif
 
 	ret = msm_dss_enable_vreg(
 		ctrl_pdata->panel_power_data.vreg_config,
@@ -3250,6 +3257,22 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 	if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
 		pr_err("%s:%d, TE gpio not specified\n",
 						__func__, __LINE__);
+
+    #ifdef CONFIG_BOARD_TULIP
+	ctrl_pdata->disp_vddi_1p8_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+		"qcom,platform-vddi-gpio", 0);
+
+	if (!gpio_is_valid(ctrl_pdata->disp_vddi_1p8_gpio))
+		pr_err("%s:%d, lcd vddi gpio not specified\n",
+			__func__, __LINE__);
+
+	ctrl_pdata->disp_vci_3p3_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+		"qcom,platform-vci-gpio", 0);
+
+	if (!gpio_is_valid(ctrl_pdata->disp_vci_3p3_gpio))
+		pr_err("%s:%d, lcd vci gpio not specified\n",
+			__func__, __LINE__);
+    #endif
 
 	ctrl_pdata->bklt_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-bklight-en-gpio", 0);

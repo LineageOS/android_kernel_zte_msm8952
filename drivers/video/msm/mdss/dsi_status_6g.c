@@ -18,6 +18,11 @@
 #include "mdss_dsi.h"
 #include "mdss_mdp.h"
 
+#ifdef CONFIG_BOARD_TULIP
+static int g_status_error_number = 0;
+static int g_old_status = 1;
+#endif
+
 /*
  * mdss_check_te_status() - Check the status of panel for TE based ESD.
  * @ctrl_pdata   : dsi controller data
@@ -162,6 +167,32 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	if (mipi->mode == DSI_CMD_MODE)
 		mutex_unlock(&mdp5_data->ov_lock);
 
+    #ifdef CONFIG_BOARD_TULIP
+	if ((pstatus_data->mfd->panel_power_state == (int)MDSS_PANEL_POWER_ON)) {
+		if (ret > 0)
+			schedule_delayed_work(&pstatus_data->check_status,
+				msecs_to_jiffies(interval));
+		else {
+			pr_err("%s: ret=%d g_old_status=%d g_status_error_number=%d\n",
+				__func__, ret, g_old_status, g_status_error_number);
+
+			if (g_old_status <= 0)
+				g_status_error_number++;
+			else
+				g_status_error_number = 0;
+
+			if (g_status_error_number < 2) {
+				schedule_delayed_work(&pstatus_data->check_status,
+					msecs_to_jiffies(interval));
+			} else {
+				g_status_error_number = 0;
+				g_old_status = 1;
+				goto status_dead;
+			}
+		}
+	}
+	g_old_status = ret;
+    #else
 	if ((pstatus_data->mfd->panel_power_state == MDSS_PANEL_POWER_ON)) {
 		if (ret > 0)
 			schedule_delayed_work(&pstatus_data->check_status,
@@ -169,6 +200,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 		else
 			goto status_dead;
 	}
+    #endif
 
 	if (pdata->panel_info.panel_force_dead) {
 		pr_debug("force_dead=%d\n", pdata->panel_info.panel_force_dead);

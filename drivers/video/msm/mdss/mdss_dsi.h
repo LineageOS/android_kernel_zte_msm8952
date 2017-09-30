@@ -395,6 +395,10 @@ struct mdss_dsi_ctrl_pdata {
 	int rst_gpio;
 	int disp_en_gpio;
 	int bklt_en_gpio;
+    #ifdef CONFIG_BOARD_TULIP
+	int disp_vddi_1p8_gpio;
+	int disp_vci_3p3_gpio;
+    #endif
 	int lcd_mode_sel_gpio;
 	int bklt_ctrl;	/* backlight ctrl */
 	bool pwm_pmi;
@@ -545,6 +549,9 @@ int mdss_dsi_shadow_clk_init(struct platform_device *pdev,
 void mdss_dsi_shadow_clk_deinit(struct device *dev,
 			struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable);
+#ifdef CONFIG_BOARD_TULIP
+int mdss_dsi_panel_power_enable(struct mdss_panel_data *pdata, int enable);
+#endif
 void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);

@@ -1,0 +1,414 @@
+/*
+ * device tree for zte tulip board
+ */
+#include "touch-key-backlight-tulip.dtsi"
+#include "zte-msm8952-tulip-camera.dtsi"
+
+/ {
+	aliases {
+		spi5 = &spi_5;
+	};
+};
+
+&pmi8950_charger {
+	qcom,float-voltage-mv = <4400>;
+	qcom,fastchg-current-ma = <2700>;
+	qcom,fastchg-current-comp = <700>;
+	qcom,thermal-mitigation = <2700 2200 1800 1500 1000 500 300 0>;
+};
+&pmi8950_fg{
+	qcom,cool-bat-decidegc = <100>;
+	qcom,vbat-estimate-diff-mv = <150>;
+};
+&mtp_batterydata {
+		#include "ZTE_P852A10_4v4_2700mAh.dtsi"
+};
+
+&pmi8950_haptic{
+	interrupt-names = "sc-irq", "play-irq";
+	qcom,play-mode = "direct";
+	qcom,wave-play-rate-us = <4255>;
+	qcom,actuator-type = "lra";
+	qcom,wave-shape = "sine";
+	qcom,lra-auto-res-mode = "none";
+	qcom,vmax-mv = <2552>;
+	qcom,ilim-ma = <127>;
+	qcom,sc-deb-cycles = <8>;
+	qcom,int-pwm-freq-khz = <505>;
+	qcom,en-brake;
+	qcom,brake-pattern = [03 03 00 00];
+	qcom,use-play-irq;
+	qcom,use-sc-irq;
+	qcom,wave-samples = [3e 3e 3e 3e 3e 3e 3e 3e];
+	qcom,wave-rep-cnt = <1>;
+	qcom,wave-samp-rep-cnt = <1>;
+};
+
+&i2c_2 {
+	aw2013@45 {
+		compatible = "awinic,aw2013";
+		reg = <0x45>;
+		vdd-supply = <&pm8950_l10>;
+		vcc-supply = <&pm8950_l5>;
+
+		aw2013,blue {
+			aw2013,name = "blue";
+			aw2013,id = <0>;
+			aw2013,max-brightness = <255>;
+			aw2013,max-current = <1>;
+			aw2013,rise-time-ms = <4>;
+			aw2013,hold-time-ms = <1>;
+			aw2013,fall-time-ms = <4>;
+			aw2013,off-time-ms = <3>;
+		};
+
+		aw2013,green {
+			aw2013,name = "green";
+			aw2013,id = <1>;
+			aw2013,max-brightness = <255>;
+			aw2013,max-current = <1>;
+			aw2013,rise-time-ms = <4>;
+			aw2013,hold-time-ms = <1>;
+			aw2013,fall-time-ms = <4>;
+			aw2013,off-time-ms = <3>;
+		};
+
+		aw2013,red {
+			aw2013,name = "red";
+			aw2013,id = <2>;
+			aw2013,max-brightness = <255>;
+			aw2013,max-current = <1>;
+			aw2013,rise-time-ms = <4>;
+			aw2013,hold-time-ms = <1>;
+			aw2013,fall-time-ms = <4>;
+			aw2013,off-time-ms = <3>;
+		};
+	};
+};
+
+&soc {
+	tlmm_pinmux: pinctrl@1000000 {
+		hall_int_pin {
+			qcom,pins = <&gp 38>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "hall-irq";
+			hall_sensor_int_default: hall_sensor_int_default {
+			    drive-strength = <6>;
+			    bias-pull-up;
+			};
+		};
+	};
+
+	hall {
+		compatible = "hall-switch";
+		pinctrl-names = "default";
+		pinctrl-0 = <&hall_sensor_int_default>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <38 0x2003>;
+		vddio-supply = <&pm8950_l6>;
+		linux,gpio-int = <&msm_gpio 38 0x1>;
+		linux,wakeup;
+		linux,min-uv = <1650000>;
+		linux,max-uv = <3300000>;
+	};
+/*
+	gpio_keys {
+		camera_focus {
+			status = "disabled";
+		};
+
+		camera_snapshot {
+			status = "disabled";
+		};
+	};
+*/
+	i2c@78b6000 {
+		wsa881x-i2c-codec@e {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@44 {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@f {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@45 {
+			status = "disabled";
+		};
+	};
+
+	i2c@7af8000 {
+		wsa881x-i2c-codec@e {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@44 {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@f {
+			status = "disabled";
+		};
+
+		wsa881x-i2c-codec@45 {
+			status = "disabled";
+		};
+	};
+
+	int_codec: sound {
+		status = "disabled";
+	};
+
+	spi@78B5000 {
+		reg-names = "spi_physical", "spi_bam_physical";
+		reg = <0x78B5000 0x600>,
+		      <0x7884000 0x1F000>;
+		status = "ok";
+	};
+
+/* ZTE_MODIFY add for audio by lvrongguo begin */
+	spi_5: spi@7af5000 {
+		compatible = "qcom,spi-qup-v2";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "spi_physical", "spi_bam_physical";
+		reg = <0x7af5000 0x600>,
+		      <0x7ac4000 0x23000>;
+		interrupt-names = "spi_irq", "spi_bam_irq";
+		interrupts = <0 299 0>, <0 239 0>;
+		spi-max-frequency = <19200000>;
+		pinctrl-names = "spi_default", "spi_sleep";
+		pinctrl-0 = <&spi5_default &spi5_cs0_active>;
+		pinctrl-1 = <&spi5_sleep &spi5_cs0_sleep>;
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup1_spi_apps_clk>;
+		clock-names = "iface_clk", "core_clk";
+		qcom,infinite-mode = <0>;
+		qcom,use-bam;
+		qcom,use-pinctrl;
+		qcom,ver-reg-exists;
+		qcom,bam-consumer-pipe-index = <4>;
+		qcom,bam-producer-pipe-index = <5>;
+		qcom,master-id = <84>;
+		qcom,shared;
+		status = "okay";
+
+		spi_ak4962@0 {
+			compatible = "qcom,ak4962-spi";
+			reg = <0>;
+			spi-max-frequency = <9600000>;
+		};
+	};
+/* ZTE_MODIFY add for audio by lvrongguo end */
+	i2c@7af5000 {
+		status = "disabled";
+	};
+
+	dai_sec_auxpcm: qcom,msm-sec-auxpcm {
+		compatible = "qcom,msm-auxpcm-dev";
+		qcom,msm-cpudai-auxpcm-mode = <0>, <0>;
+		qcom,msm-cpudai-auxpcm-sync = <1>, <1>;
+		qcom,msm-cpudai-auxpcm-frame = <5>, <4>;
+		qcom,msm-cpudai-auxpcm-quant = <2>, <2>;
+		qcom,msm-cpudai-auxpcm-num-slots = <1>, <1>;
+		qcom,msm-cpudai-auxpcm-slot-mapping = <1>, <1>;
+		qcom,msm-cpudai-auxpcm-data = <0>, <0>;
+		qcom,msm-cpudai-auxpcm-pcm-clk-rate = <2048000>, <2048000>;
+		qcom,msm-auxpcm-interface = "secondary";
+	};
+
+	ak49xx_intc: ak49xx-irq {
+		compatible = "akm,ak49xx-irq";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <73 0>;
+		interrupt-names = "cdc-int";
+	};
+
+	ext_codec: sound-4962 {
+		compatible = "qcom,msm8952-audio-slim-codec";
+		qcom,model = "msm8952-ak4962-snd-card";
+
+		clock-names = "ak4962_clk";
+		clocks = <&clock_gcc clk_div_clk2>;
+
+		reg = <0xc051000 0x4>,
+		    <0xc051004 0x4>,
+		    <0xc055000 0x4>,
+		    <0xc052000 0x4>;
+
+		reg-names = "csr_gp_io_mux_mic_ctl",
+			"csr_gp_io_mux_spkr_ctl",
+			"csr_gp_io_lpaif_pri_pcm_pri_mode_muxsel",
+			"csr_gp_io_mux_quin_ctl";
+
+		qcom,msm-gpios =
+			"us_eu_gpio";
+		qcom,pinctrl-names =
+			"all_off",
+			"us_eu_gpio_act";
+		pinctrl-names =
+			"all_off",
+			"us_eu_gpio_act";
+		pinctrl-0 = <&cross_conn_det_sus>;
+		pinctrl-1 = <&cross_conn_det_act>;
+
+		tfa,spk-rcv-switch-gpio =<&msm_gpio 86 0>;
+		qcom,cdc-us-euro-gpios = <&msm_gpio 144 0>;
+		qcom,headset-jack-type-NC;
+		qcom,audio-routing =
+			"AIF4 VI", "MCLK",
+			"RX_BIAS", "MCLK",
+			"AMIC2", "MIC BIAS2",
+			"MIC BIAS2", "Headset Mic",
+			"AMIC3", "MIC BIAS2",
+			"MIC BIAS2", "ANCRight Headset Mic",
+			"AMIC4", "MIC BIAS2",
+			"MIC BIAS2", "ANCLeft Headset Mic",
+			"AMIC5", "MIC BIAS3",
+			"MIC BIAS3", "Handset Mic",
+			"AMIC6", "MIC BIAS4",
+			"MIC BIAS4", "Analog Mic6",
+			"DMIC0", "MIC BIAS1",
+			"MIC BIAS1", "Digital Mic0",
+			"DMIC1", "MIC BIAS1",
+			"MIC BIAS1", "Digital Mic1",
+			"DMIC2", "MIC BIAS3",
+			"MIC BIAS3", "Digital Mic2",
+			"DMIC3", "MIC BIAS3",
+			"MIC BIAS3", "Digital Mic3",
+			"DMIC4", "MIC BIAS4",
+			"MIC BIAS4", "Digital Mic4",
+			"DMIC5", "MIC BIAS4",
+			"MIC BIAS4", "Digital Mic5",
+			"SpkrLeft IN", "SPK1 OUT",
+			"SpkrRight IN", "SPK2 OUT";
+
+		qcom,msm-mbhc-hphl-swh = <0>;
+		qcom,msm-mbhc-gnd-swh = <0>;
+		qcom,tasha-mclk-clk-freq = <9600000>;
+		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
+				<&loopback>, <&compress>, <&hostless>,
+				<&afe>, <&lsm>, <&routing>, <&cpe>, <&lpa>;
+		asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-dsp.1",
+				"msm-pcm-dsp.2", "msm-voip-dsp",
+				"msm-pcm-voice", "msm-pcm-loopback",
+				"msm-compress-dsp", "msm-pcm-hostless",
+				"msm-pcm-afe", "msm-lsm-client",
+				"msm-pcm-routing", "msm-cpe-lsm",
+				"msm-pcm-lpa";
+		asoc-cpu = <&dai_pri_auxpcm>, <&dai_hdmi>, <&dai_mi2s_hdmi>,
+				<&dai_mi2s2>, <&dai_mi2s3>, <&dai_mi2s5>,
+				<&sb_0_rx>, <&sb_0_tx>, <&sb_1_rx>, <&sb_1_tx>,
+				<&sb_2_rx>, <&sb_2_tx>, <&sb_3_rx>, <&sb_3_tx>,
+				<&sb_4_rx>, <&sb_4_tx>, <&sb_5_tx>,
+				<&afe_pcm_rx>, <&afe_pcm_tx>,
+				 <&afe_proxy_rx>, <&afe_proxy_tx>,
+				<&incall_record_rx>, <&incall_record_tx>,
+				<&incall_music_rx>, <&incall_music_2_rx>,
+				<&sb_5_rx>,  <&bt_sco_rx>,
+				<&bt_sco_tx>, <&int_fm_rx>, <&int_fm_tx>;
+		asoc-cpu-names = "msm-dai-q6-auxpcm.1",	"msm-dai-q6-hdmi.8",
+				"msm-dai-q6-mi2s-hdmi.4118",
+				"msm-dai-q6-mi2s.2",
+				"msm-dai-q6-mi2s.3", "msm-dai-q6-mi2s.5",
+				"msm-dai-q6-dev.16384", "msm-dai-q6-dev.16385",
+				"msm-dai-q6-dev.16386", "msm-dai-q6-dev.16387",
+				"msm-dai-q6-dev.16388", "msm-dai-q6-dev.16389",
+				"msm-dai-q6-dev.16390", "msm-dai-q6-dev.16391",
+				"msm-dai-q6-dev.16392", "msm-dai-q6-dev.16393",
+				"msm-dai-q6-dev.16395", "msm-dai-q6-dev.224",
+				"msm-dai-q6-dev.225", "msm-dai-q6-dev.241",
+				"msm-dai-q6-dev.240", "msm-dai-q6-dev.32771",
+				"msm-dai-q6-dev.32772", "msm-dai-q6-dev.32773",
+				"msm-dai-q6-dev.32770", "msm-dai-q6-dev.16394",
+				"msm-dai-q6-dev.12288", "msm-dai-q6-dev.12289",
+				"msm-dai-q6-dev.12292", "msm-dai-q6-dev.12293";
+		asoc-codec = <&stub_codec>;
+		asoc-codec-names = "msm-stub-codec.1";
+		asoc-wsa-codec-names = "wsa881x.20170212", "wsa881x.20170211";
+		asoc-wsa-codec-prefixes = "SpkrLeft", "SpkrRight";
+	};
+
+	cpe: qcom,msm-cpe-lsm {
+		compatible = "qcom,msm-cpe-lsm";
+	};
+
+	clock_audio: audio_ext_clk {
+		compatible = "qcom,audio-ref-clk";
+		qcom,audio-ref-clk-gpio = <&pm8950_gpios 1 0>;
+		clock-names = "osr_clk";
+		clocks = <&clock_gcc clk_div_clk2>;
+		qcom,node_has_rpm_clock;
+		#clock-cells = <1>;
+	};
+
+	slim_msm: slim@c140000 {
+		status = "ok";
+
+		msm_dai_slim {
+			compatible = "qcom,msm-dai-slim";
+			elemental-addr = [ff ff ff fe 17 02];
+		};
+
+		ak4962_codec {
+			compatible = "qcom,ak4962-slim-pgd";
+			elemental-addr = [00 02 62 49 DD 01];
+
+			/*clock-names = "ak4962_clk";*/
+			/*clocks = <&clock_gcc clk_div_clk2>;*/
+
+			interrupt-parent = <&ak49xx_intc>;
+			interrupts = <0 1 2 3 4 5 6>, <7 8 9 10 11 12 13>,
+					<14 15 16 17 18 19 20>, <21 22 23 24 25 26 27 28>;
+
+			akm,cdc-reset-gpio = <&msm_gpio 68 0>;
+			akm,cdc-ldo-gpio = <&msm_gpio 9 0>;
+			akm,cdc-cif1-gpio = <&msm_gpio 74 0>;
+			/*akm,cdc-2p15-en-gpio =<&msm_gpio 72 0>;*/
+
+			tfa,pa-spk-rst-gpio = <&msm_gpio 87 0>;
+			tfa,pa-rcv-rst-gpio = <&msm_gpio 62 0>;
+
+			cdc-vdd-tx-h-supply = <&pm8950_l5>;
+			akm,cdc-vdd-tx-h-voltage = <1800000 1800000>;
+			akm,cdc-vdd-tx-h-current = <20000>;
+
+			cdc-vdd-rx-h-supply = <&pm8950_l5>;
+			akm,cdc-vdd-rx-h-voltage = <1800000 1800000>;
+			akm,cdc-vdd-rx-h-current = <20000>;
+
+			cdc-vdd-px-supply = <&pm8950_l5>;
+			akm,cdc-vdd-px-voltage = <1800000 1800000>;
+			akm,cdc-vdd-px-current = <45000>;
+
+			akm,cdc-static-supplies = "cdc-vdd-tx-h",
+						   "cdc-vdd-rx-h",
+						   "cdc-vdd-px";
+
+			akm,cdc-micbias-mpwr1-mv = <0>;
+			akm,cdc-micbias-mpwr2-mv = <2800>;
+
+			akm,cdc-mclk-clk-rate = <9600000>;
+			akm,cdc-slim-ifd = "ak4962-slim-ifd";
+			akm,cdc-slim-ifd-elemental-addr = [00 00 62 49 DD 01];
+		};
+	};
+};
+
+&pm8950_gpios {
+	gpio@c000 {
+		status = "ok";
+		qcom,mode = <1>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <2>;
+		qcom,master-en = <1>;
+		qcom,out-strength = <2>;
+	};
+};

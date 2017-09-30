@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <soc/qcom/socinfo.h>
 
 struct boot_stats {
 	uint32_t bootloader_start;
@@ -88,9 +89,80 @@ static void print_boot_stats(void)
 		mpm_counter_freq);
 }
 
+/*
+ * Support for FTM & RECOVERY mode by ZTE_BOOT
+ */
+#ifdef CONFIG_ZTE_BOOT_MODE
+static int __init bootmode_init(char *mode)
+{
+	int boot_mode = 0;
+
+	if (!strncmp(mode, ANDROID_BOOT_MODE_NORMAL, strlen(ANDROID_BOOT_MODE_NORMAL))) {
+		boot_mode = ENUM_BOOT_MODE_NORMAL;
+		pr_err("KERENEL:boot_mode:NORMAL\n");
+	} else if (!strncmp(mode, ANDROID_BOOT_MODE_FTM, strlen(ANDROID_BOOT_MODE_FTM))) {
+		boot_mode = ENUM_BOOT_MODE_FTM;
+		pr_err("KERENEL:boot_mode:FTM\n");
+	} else if (!strncmp(mode, ANDROID_BOOT_MODE_RECOVERY, strlen(ANDROID_BOOT_MODE_RECOVERY))) {
+		boot_mode = ENUM_BOOT_MODE_RECOVERY;
+		pr_err("KERENEL:boot_mode:RECOVERY\n");
+	} else if (!strncmp(mode, ANDROID_BOOT_MODE_FFBM, strlen(ANDROID_BOOT_MODE_FFBM))) {
+		boot_mode = ENUM_BOOT_MODE_FFBM;
+		pr_err("KERENEL:boot_mode:FFBM\n");
+	} else {
+		boot_mode = ENUM_BOOT_MODE_NORMAL;
+		pr_err("KERENEL:boot_mode:DEFAULT NORMAL\n");
+	}
+
+	socinfo_set_boot_mode(boot_mode);
+
+	return 0;
+}
+__setup(ANDROID_BOOT_MODE, bootmode_init);
+#endif
+
+#if defined(CONFIG_BOARD_JASMINE)
+/*
+ * Support for marking sw version by ZTE_BOOT
+*/
+#define SWVER_FLAG_RESERVED_COOKIE 0x20170122
+#define ZTE_SW_VER_PROP "qcom,msm-imem-zte_sw_ver"
+static const char *zte_sw_ver_str[2] = { "DEV", "PV"};
+
+const char *read_zte_sw_ver(void)
+{
+	struct device_node *np;
+	void *zte_sw_ver_imem_addr = NULL;
+
+	np = of_find_compatible_node(NULL, NULL, ZTE_SW_VER_PROP);
+	if (!np) {
+		pr_err("unable to find DT imem zte sw ver node!\n");
+	} else {
+		zte_sw_ver_imem_addr = of_iomap(np, 0);
+		if (zte_sw_ver_imem_addr) {
+			if (SWVER_FLAG_RESERVED_COOKIE == *(u32 *)zte_sw_ver_imem_addr)
+				return zte_sw_ver_str[1];
+		} else {
+			pr_err("unable to map imem zte sw ver addr!\n");
+		}
+	}
+
+	return zte_sw_ver_str[0];
+
+}
+#endif
+
 int boot_stats_init(void)
 {
 	int ret;
+
+#if defined(CONFIG_BOARD_JASMINE)
+	const char *sw_ver = NULL;
+
+	sw_ver = read_zte_sw_ver();
+	pr_err("%s: zte sw_ver=%s\n", __func__, sw_ver);
+	socinfo_sync_sysfs_zte_sw_ver(sw_ver);
+#endif
 
 	ret = mpm_parse_dt();
 	if (ret < 0)

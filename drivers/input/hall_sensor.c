@@ -25,9 +25,12 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
 
 #define	LID_DEV_NAME	"hall_sensor"
 #define HALL_INPUT	"/dev/input/hall_dev"
+extern int gloved_finger_hall_status(bool flag); /* add by tp for gloved mode */
 
 struct hall_data {
 	int gpio;	/* device use gpio number */
@@ -40,6 +43,7 @@ struct hall_data {
 	u32 max_uv;	/* device allow max voltage */
 };
 
+struct hall_data *g_hall_data;
 static irqreturn_t hall_interrupt_handler(int irq, void *dev)
 {
 	int value;
@@ -49,9 +53,11 @@ static irqreturn_t hall_interrupt_handler(int irq, void *dev)
 		data->active_low;
 	if (value) {
 		input_report_switch(data->hall_dev, SW_LID, 0);
+		gloved_finger_hall_status(false);
 		dev_dbg(&data->hall_dev->dev, "far\n");
 	} else {
 		input_report_switch(data->hall_dev, SW_LID, 1);
+		gloved_finger_hall_status(true);
 		dev_dbg(&data->hall_dev->dev, "near\n");
 	}
 	input_sync(data->hall_dev);
@@ -196,6 +202,81 @@ static int hall_parse_dt(struct device *dev, struct hall_data *data)
 }
 #endif
 
+static int hall_status_proc_show(struct seq_file *m, void *v)
+{
+	int value;
+
+	value = (gpio_get_value_cansleep(g_hall_data->gpio) ? 1 : 0) ^
+		g_hall_data->active_low;
+	if (value)
+		seq_puts(m, "0\n");
+	else
+		seq_puts(m, "1\n");
+
+	return 0;
+}
+
+static int hall_status_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, hall_status_proc_show, NULL);
+}
+
+static const struct file_operations hall_status_proc_fops = {
+	.open		= hall_status_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int hall_status_proc_init(void)
+{
+	struct proc_dir_entry *res;
+
+	res = proc_create("hall_status",  0, NULL,
+			  &hall_status_proc_fops);
+	if (!res) {
+		dev_err(&g_hall_data->hall_dev->dev, "failed to create hall_status\n");
+		return -ENOMEM;
+	}
+
+	dev_dbg(&g_hall_data->hall_dev->dev, "created hall_status\n");
+	return 0;
+}
+
+static ssize_t hall_device_status_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct hall_data *data = dev_get_drvdata(dev);
+	int value;
+
+	value = (gpio_get_value_cansleep(data->gpio) ? 1 : 0) ^
+		data->active_low;
+
+	return snprintf(buf, sizeof(int), "%d\n", value);
+}
+
+static struct device_attribute hall_attrs[] = {
+	__ATTR(hall_status, 0444, hall_device_status_show, NULL),
+};
+
+static int add_sysfs_interfaces(struct device *dev,
+	struct device_attribute *a, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		if (device_create_file(dev, a + i))
+			goto undo;
+
+	return 0;
+
+undo:
+	for (; i >= 0 ; i--)
+		device_remove_file(dev, a + i);
+	dev_dbg(dev, "%s: failed to create sysfs interface\n", __func__);
+
+	return -ENODEV;
+}
 static int hall_driver_probe(struct platform_device *dev)
 {
 	struct hall_data *data;
@@ -210,6 +291,8 @@ static int hall_driver_probe(struct platform_device *dev)
 				"failed to allocate memory %d\n", err);
 		goto exit;
 	}
+
+	g_hall_data = data;
 	dev_set_drvdata(&dev->dev, data);
 	if (dev->dev.of_node) {
 		err = hall_parse_dt(&dev->dev, data);
@@ -269,6 +352,13 @@ static int hall_driver_probe(struct platform_device *dev)
 		goto err_regulator_init;
 	}
 
+	err = add_sysfs_interfaces(&dev->dev, hall_attrs, ARRAY_SIZE(hall_attrs));
+	if (err < 0) {
+		dev_err(&dev->dev, "sysfs interface add failed: %d\n", err);
+		goto exit;
+	}
+
+	hall_status_proc_init();
 	return 0;
 
 err_regulator_init:

@@ -231,6 +231,7 @@ config ARCH_MSM
 config ARCH_MSM8916
 	bool "Enable Support for Qualcomm MSM8916"
 	depends on ARCH_MSM
+	select ZTE_BOOT_MODE
 	select RCU_BOOST if DEBUG_KMEMLEAK
 	help
 	  This enables support for the MSM8916 chipset. If you dont
@@ -272,6 +273,29 @@ config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
+
+endmenu
+
+menu "MSM Board Selection"
+
+config ZTE_BOOT_MODE
+	depends on ARCH_MSM8916
+	bool "ZTE BOOT MODE"
+	default n
+	help
+	  Support for boot mode
+
+config BOARD_JASMINE
+	depends on ARCH_MSM8916
+	bool "ZTE JASMINE"
+	help
+	  Support for ZTE MSM8952 JASMINE device.
+
+config BOARD_TULIP
+	depends on ARCH_MSM8916
+	bool "ZTE TULIP"
+	help
+	  Support for ZTE MSM8952 TULIP device.
 
 endmenu
 

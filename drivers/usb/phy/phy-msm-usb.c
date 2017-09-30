@@ -2093,6 +2093,7 @@ static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
 	motg->cur_power = mA;
 }
 
+static int skip_invalid_chg_work = 0;
 static int msm_otg_set_power(struct usb_phy *phy, unsigned mA)
 {
 	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
@@ -2104,9 +2105,15 @@ static int msm_otg_set_power(struct usb_phy *phy, unsigned mA)
 	 * IDEV_CHG can be drawn irrespective of suspend/un-configured
 	 * states when CDP/ACA is connected.
 	 */
-	if (motg->chg_type == USB_SDP_CHARGER)
-		msm_otg_notify_charger(motg, mA);
+	if (motg->chg_type == USB_SDP_CHARGER) {
+		pr_err("usb %s mA:%d\n", __func__, mA);
+		/* wall charger in which D+/D- disconnected
+			would be recognized as usb cable */
+		if (mA >= IDEV_CHG_MIN)
+			skip_invalid_chg_work = 1;
 
+		msm_otg_notify_charger(motg, mA);
+	}
 	return 0;
 }
 
@@ -3188,6 +3195,20 @@ static void msm_chg_detect_work(struct work_struct *w)
 	queue_delayed_work(motg->otg_wq, &motg->chg_work, delay);
 }
 
+/* wall charger in which D+/D- disconnected would be recognized as usb cable */
+static void msm_invalid_chg_work(struct work_struct *w)
+{
+	struct msm_otg *motg = container_of(w, struct msm_otg, invalid_chg_work.work);
+
+	if (skip_invalid_chg_work) {
+		skip_invalid_chg_work = 0;
+		return;
+	}
+	pr_info("usb schedule %s\n", __func__);
+	/* set 501 to indicate this statemA */
+	msm_otg_notify_charger(motg, IDEV_CHG_MIN + 1);
+}
+
 #define VBUS_INIT_TIMEOUT	msecs_to_jiffies(5000)
 
 /*
@@ -3460,11 +3481,12 @@ static void msm_otg_sm_work(struct work_struct *w)
 						OTG_STATE_B_PERIPHERAL;
 					break;
 				case USB_SDP_CHARGER:
+					msm_otg_notify_charger(motg, 100);
+					pr_info("%s start time 10s  invaild_chg_work\n", __func__);
+					schedule_delayed_work(&motg->invalid_chg_work, 10*HZ);
 					msm_otg_start_peripheral(otg, 1);
-					otg->phy->state =
-						OTG_STATE_B_PERIPHERAL;
-					mod_timer(&motg->chg_check_timer,
-							CHG_RECHECK_DELAY);
+					otg->phy->state = OTG_STATE_B_PERIPHERAL;
+					mod_timer(&motg->chg_check_timer, CHG_RECHECK_DELAY);
 					break;
 				default:
 					break;
@@ -3495,6 +3517,10 @@ static void msm_otg_sm_work(struct work_struct *w)
 			clear_bit(A_BUS_REQ, &motg->inputs);
 			cancel_delayed_work_sync(&motg->chg_work);
 			dcp = (motg->chg_type == USB_DCP_CHARGER);
+			/* wall charger in which D+/D- disconnected would be recognized as usb cable */
+			cancel_delayed_work_sync(&motg->invalid_chg_work);
+			skip_invalid_chg_work = 0;
+
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
 			msm_otg_notify_charger(motg, 0);
@@ -6014,6 +6040,8 @@ static int msm_otg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&motg->chg_work, msm_chg_detect_work);
 	INIT_DELAYED_WORK(&motg->id_status_work, msm_id_status_w);
 	INIT_DELAYED_WORK(&motg->suspend_work, msm_otg_suspend_work);
+	INIT_DELAYED_WORK(&motg->invalid_chg_work, msm_invalid_chg_work);
+
 	setup_timer(&motg->id_timer, msm_otg_id_timer_func,
 				(unsigned long) motg);
 	setup_timer(&motg->chg_check_timer, msm_otg_chg_check_timer_func,
@@ -6364,6 +6392,9 @@ static int msm_otg_remove(struct platform_device *pdev)
 	cancel_delayed_work_sync(&motg->chg_work);
 	cancel_delayed_work_sync(&motg->id_status_work);
 	cancel_delayed_work_sync(&motg->suspend_work);
+	cancel_delayed_work_sync(&motg->invalid_chg_work);
+	skip_invalid_chg_work = 0;
+
 	cancel_work_sync(&motg->sm_work);
 	destroy_workqueue(motg->otg_wq);
 

@@ -1,0 +1,67 @@
+/*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8952-mtp.dtsi"
+#include "zte-msm8952-jasmine.dtsi"
+
+#include "dsi-panel-zte-boe-jd9366-boe-8p0-800p-video.dtsi"
+#include "dsi-panel-zte-xingyuan-rm72013-auo-8p0-800p-video.dtsi"
+#include "dsi-panel-zte-xingyuan-rm68200-auo-8p0-800p-video.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc.ZTE MSM8952 JASMINE";
+	compatible = "qcom,msm8952-mtp", "qcom,msm8952", "qcom,mtp";
+	qcom,board-id= <105 0>;
+};
+
+&pmi8950_charger {
+	qcom,float-voltage-mv = <4350>;
+	qcom,fastchg-current-ma = <2300>;
+	qcom,force-aicl-rerun;
+};
+&pmi8950_fg{
+	qcom,cool-bat-decidegc = <100>;
+	qcom,vbat-estimate-diff-mv = <150>;
+};
+&mtp_batterydata {
+		#include "ZTE_P895A80_4620mAh_sony.dtsi"
+		#include "ZTE_P895A80_4620mAh_ATL.dtsi"
+};
+
+&mdss_dsi0 {
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+	qcom,dsi-pref-prim-pan = <&dsi_boe_jd9366_boe_8p0_800P_video_vid>;
+	qcom,platform-reset-gpio = <&msm_gpio 0 0>;
+};
+
+&dsi_boe_jd9366_boe_8p0_800P_video_vid {
+	//qcom,panel-supply-entries = <&dsi_panel_pwr_supply>; //zte_tzb delete, otherwise many LCD errors and panel can not wake up.
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	qcom,ulps-enabled;
+};
+
+&dsi_xingyuan_rm72013_auo_8p0_800P_video_vid {
+	//qcom,panel-supply-entries = <&dsi_panel_pwr_supply>; //zte_tzb delete, otherwise many LCD errors and panel can not wake up.
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	qcom,ulps-enabled;
+};
+
+&dsi_xingyuan_rm68200_auo_8p0_800P_video_vid {
+	//qcom,panel-supply-entries = <&dsi_panel_pwr_supply>; //zte_tzb delete, otherwise many LCD errors and panel can not wake up.
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+	qcom,ulps-enabled;
+};

@@ -24,6 +24,9 @@
 
 #include "mdss_dsi.h"
 #include "mdss_dba_utils.h"
+#include <linux/proc_fs.h>
+static struct proc_dir_entry *d_entry;
+static char  module_name[50] = {"0"};
 
 #define DT_CMD_HDR 6
 #define MIN_REFRESH_RATE 48
@@ -33,13 +36,60 @@ DEFINE_LED_TRIGGER(bl_led_trigger);
 
 #define CEIL(x, y)	(((x) + ((y)-1)) / (y))
 
-static u32 rc_buf_thresh[] = {0x0e, 0x1c, 0x2a, 0x38, 0x46, 0x54, 0x62,
-	0x69, 0x70, 0x77, 0x79, 0x7b, 0x7d, 0x7e};
-static char rc_range_min_qp[] = {0, 0, 1, 1, 3, 3, 3, 3, 3, 3, 5, 5, 5, 7, 13};
-static char rc_range_max_qp[] = {4, 4, 5, 6, 7, 7, 7, 8, 9, 10, 11, 12,
-	13, 13, 15};
-static char rc_range_bpg_offset[] = {2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10,
-	-12, -12, -12, -12};
+static u32 rc_buf_thresh[] = {
+	0x0e, 0x1c, 0x2a, 0x38, 0x46, 0x54, 0x62,
+	0x69, 0x70, 0x77, 0x79, 0x7b, 0x7d, 0x7e
+};
+
+static char rc_range_min_qp[] = {
+	0, 0, 1, 1, 3, 3, 3, 3, 3, 3, 5, 5, 5, 7, 13
+};
+
+static char rc_range_max_qp[] = {
+	4, 4, 5, 6, 7, 7, 7, 8, 9, 10, 11, 12, 13, 13, 15
+};
+
+static char rc_range_bpg_offset[] = {
+	2, 0, 0, -2, -4, -6, -8, -8, -8, -10, -10, -12, -12, -12, -12
+};
+
+ssize_t mdss_dsi_panel_lcd_read_proc(struct file *file, char __user *page, size_t size, loff_t *ppos)
+{
+	int len = 0;
+
+	pr_info("%s:---enter---\n", __func__);
+	if (*ppos) {
+		return 0;
+	}
+	len = snprintf(page, size, "%s\n",  module_name);
+	*ppos += len;
+	return len;
+}
+
+static const struct file_operations proc_ops = {
+	.owner = THIS_MODULE,
+	.read = mdss_dsi_panel_lcd_read_proc,
+	.write = NULL,
+};
+
+void  mdss_dsi_panel_lcd_proc(struct device_node *node)
+{
+	const char *panel_name;
+
+	d_entry = proc_create("msm_lcd", 0664, NULL, &proc_ops);
+	if (d_entry == NULL) {
+		pr_err("proc_create ts_information failed!\n");
+	}
+	panel_name = of_get_property(node,
+		"qcom,mdss-dsi-panel-name", NULL);
+	if (!panel_name) {
+		pr_info("LCD %s:%d, panel name not found!\n",
+				__func__,  __LINE__);
+	} else {
+		pr_info("LCD%s: Panel Name = %s\n", __func__, panel_name);
+		strlcpy(module_name, panel_name, sizeof(module_name));
+	}
+}
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -197,7 +247,7 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 			return;
 	}
 
-	pr_debug("%s: level=%d\n", __func__, level);
+	pr_info("%s: level=%d\n", __func__, level);
 
 	led_pwm1[1] = (unsigned char)level;
 
@@ -262,6 +312,64 @@ rst_gpio_err:
 disp_en_gpio_err:
 	return rc;
 }
+
+#ifdef CONFIG_BOARD_TULIP
+int mdss_dsi_panel_power_enable(struct mdss_panel_data *pdata, int enable)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+	int rc = 0;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+		panel_data);
+
+	pr_debug("%s: enable = %d\n", __func__, enable);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (enable) {
+		if (gpio_is_valid(ctrl_pdata->disp_vddi_1p8_gpio)) {
+			rc = gpio_request(ctrl_pdata->disp_vddi_1p8_gpio, "disp_vddi_1p8_gpio");
+			if (rc) {
+				pr_err("%s: request disp_vddi_1p8_gpio failed, rc=%d\n", __func__, rc);
+			} else {
+				gpio_direction_output(ctrl_pdata->disp_vddi_1p8_gpio, 1);
+				pr_err("%s: enable disp_vddi_1p8_gpio\n", __func__);
+				gpio_set_value((ctrl_pdata->disp_vddi_1p8_gpio), 1);
+			}
+		}
+
+		if (gpio_is_valid(ctrl_pdata->disp_vci_3p3_gpio)) {
+			rc = gpio_request(ctrl_pdata->disp_vci_3p3_gpio, "disp_vci_3p3_gpio");
+			if (rc) {
+				pr_err("%s: request disp_vci_3p3_gpio failed, rc=%d\n", __func__, rc);
+			} else {
+				gpio_direction_output(ctrl_pdata->disp_vci_3p3_gpio, 1);
+				pr_err("%s: enable disp_vci_3p3_gpio\n", __func__);
+				gpio_set_value((ctrl_pdata->disp_vci_3p3_gpio), 1);
+			}
+		}
+	} else {
+		if (gpio_is_valid(ctrl_pdata->disp_vci_3p3_gpio)) {
+			pr_err("%s: disable disp_vci_3p3_gpio\n", __func__);
+			gpio_set_value((ctrl_pdata->disp_vci_3p3_gpio), 0);
+			gpio_free(ctrl_pdata->disp_vci_3p3_gpio);
+		}
+
+		if (gpio_is_valid(ctrl_pdata->disp_vddi_1p8_gpio)) {
+			pr_err("%s: disable disp_vddi_1p8_gpio\n", __func__);
+			gpio_set_value((ctrl_pdata->disp_vddi_1p8_gpio), 0);
+			gpio_free(ctrl_pdata->disp_vddi_1p8_gpio);
+		}
+	}
+
+	return rc;
+}
+#endif
 
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
@@ -2208,6 +2316,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->low_power_config = mdss_dsi_panel_low_power_config;
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
+	mdss_dsi_panel_lcd_proc(node);
 
 	return 0;
 }

@@ -16,6 +16,17 @@
 #include "msm_sd.h"
 #include "msm_actuator.h"
 #include "msm_cci.h"
+#ifdef CONFIG_BOARD_TULIP
+#include <linux/module.h>
+#include <linux/export.h>
+#include <linux/types.h>
+#include <linux/kobject.h>
+#include "msm_camera_io_util.h"
+#include "../cci/msm_cci.h"
+#include "../msm_sensor.h"
+#include "../cci/msm_cci.h"
+#include <linux/debugfs.h>
+#endif
 
 DEFINE_MSM_MUTEX(msm_actuator_mutex);
 
@@ -90,6 +101,14 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	uint32_t size = a_ctrl->reg_tbl_size, i = 0;
 	struct msm_camera_i2c_reg_array *i2c_tbl = a_ctrl->i2c_reg_tbl;
 	CDBG("Enter\n");
+/*
+  * by ZTE_YCM_20151102 yi.changming 400032
+  */
+	if (i2c_tbl == NULL) {
+		pr_err("%s: i2c_tbl is NULL , return\n", __func__);
+		return;
+	}
+
 	for (i = 0; i < size; i++) {
 		if (write_arr[i].reg_write_type == MSM_ACTUATOR_WRITE_DAC) {
 			value = (next_lens_position <<
@@ -1112,6 +1131,17 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 			return rc;
 		}
 
+	#ifdef CONFIG_BOARD_TULIP
+		/*added by chengjia for actuator power control 2015/11/20*/
+		if ((int16_t)(a_ctrl->vaf_gpio) >= 0) {
+			gpio_set_value_cansleep(
+			    a_ctrl->vaf_gpio,
+			    GPIO_OUT_LOW);
+			gpio_free(a_ctrl->vaf_gpio);
+		}
+		/*end*/
+	#endif
+
 		if (a_ctrl->step_position_table != NULL)
 			kfree(a_ctrl->step_position_table);
 		a_ctrl->step_position_table = NULL;
@@ -1748,7 +1778,18 @@ static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 		pr_err("%s failed %d\n", __func__, __LINE__);
 		return rc;
 	}
-
+#ifdef CONFIG_BOARD_TULIP
+	/*added by chengjia for actuator power control 2015/11/20*/
+	if ((int16_t)(a_ctrl->vaf_gpio) >= 0) {
+		gpio_request_one(a_ctrl->vaf_gpio,
+			GPIOF_OUT_INIT_HIGH,
+			"vaf_gpio_control");
+		gpio_set_value_cansleep(
+			a_ctrl->vaf_gpio,
+			GPIO_OUT_HIGH);
+	}
+	/*end*/
+#endif
 	a_ctrl->actuator_state = ACT_ENABLE_STATE;
 
 	CDBG("Exit\n");
@@ -1879,6 +1920,16 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		pr_err("%s:%d failed no memory\n", __func__, __LINE__);
 		return -ENOMEM;
 	}
+#ifdef CONFIG_BOARD_TULIP
+	/*ZTE_MODIFY added by chengjia for actuator driver 2015/11/20*/
+	msm_actuator_t->vaf_gpio = of_get_gpio((&pdev->dev)->of_node, 0);
+	if ((int16_t)(msm_actuator_t->vaf_gpio) < 0) {
+		pr_info("there is no gpios control in actuator\n");
+	} else {
+		pr_info("vaf %d\n", msm_actuator_t->vaf_gpio);
+	}
+	/*ZTE_MODIFY end*/
+#endif
 	rc = of_property_read_u32((&pdev->dev)->of_node, "cell-index",
 		&pdev->id);
 	CDBG("cell-index %d, rc %d\n", pdev->id, rc);

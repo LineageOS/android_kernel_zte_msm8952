@@ -608,6 +608,7 @@ struct msm_flash_init_info_t {
 
 struct msm_flash_cfg_data_t {
 	enum msm_flash_cfg_type_t cfg_type;
+	int32_t torch_current[MAX_LED_TRIGGERS];
 	int32_t flash_current[MAX_LED_TRIGGERS];
 	int32_t flash_duration[MAX_LED_TRIGGERS];
 	union {
