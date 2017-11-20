@@ -390,7 +390,7 @@ static int msm_pcm_ioctl(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
+static int internal_msm_voice_gain_put(struct snd_kcontrol *kcontrol,
 			      struct snd_ctl_elem_value *ucontrol)
 {
 	int ret = 0;
@@ -413,6 +413,24 @@ static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
 
 done:
 	return ret;
+}
+
+static int (*do_msm_voice_gain_put)(struct snd_kcontrol *,
+				    struct snd_ctl_elem_value *);
+
+void set_msm_voice_gain_func(int (*func)(struct snd_kcontrol *, struct snd_ctl_elem_value *))
+{
+	pr_err("%s: func=%p\n", __func__, func);
+	do_msm_voice_gain_put = func;
+}
+
+static int msm_voice_gain_put(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	pr_err("%s: do_msm_voice_gain_put=%p\n", __func__, do_msm_voice_gain_put);
+	if (do_msm_voice_gain_put)
+		return do_msm_voice_gain_put(kcontrol, ucontrol);
+	return internal_msm_voice_gain_put(kcontrol, ucontrol);
 }
 
 static int msm_voice_mute_put(struct snd_kcontrol *kcontrol,

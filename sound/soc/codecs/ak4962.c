@@ -3163,6 +3163,18 @@ int akm_internal_rx_gain_set(struct snd_kcontrol *kcontrol,
 	return 0;
 #endif
 }
+
+static int soc_voice_gain_put(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	int soc_volume = ucontrol->value.integer.value[0];
+	if (soc_volume < 0 || soc_volume > 6)
+		return -EINVAL;
+	/* SOC gain is backward */
+	ucontrol->value.integer.value[0] = 6 - soc_volume;
+	return akm_internal_rx_gain_set(kcontrol, ucontrol);
+}
+
 /*add by shengguanghui for karaoke 20150606 begin*/
 static DECLARE_TLV_DB_SCALE(karaoke_mic_gain_tlv, 000, 100, 0);
 static int akm_karaoke_mic_gain_get(struct snd_kcontrol *kcontrol,
@@ -3652,10 +3664,20 @@ static int ak4962_gain_switch_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+extern void set_msm_voice_gain_func(int (*func)(struct snd_kcontrol *, struct snd_ctl_elem_value *));
+
 static int ak4962_gain_switch_set(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	ak4962_gain_set_switch = ucontrol->value.integer.value[0];
+
+	if (ak4962_gain_set_switch) {
+		set_msm_voice_gain_func(NULL);
+	}
+	else {
+		set_msm_voice_gain_func(soc_voice_gain_put);
+	}
+
 	pr_err("%s: ak4962_gain_set_switch(%d)", __func__, ak4962_gain_set_switch);
 	return 0;
 }
@@ -9050,6 +9072,9 @@ static int ak4962_probe(struct platform_device *pdev)
 	    pr_info("[YXS]hs: unable to register '/proc/hs'\n");
 	}
 /* zte jjp add headset detect /proc/hs 2015-03-30 end */
+
+	/* We control voice gain by default */
+	set_msm_voice_gain_func(soc_voice_gain_put);
 
 	return ret;
 }
