@@ -167,7 +167,6 @@ void lpm_suspend_wake_time(uint64_t wakeup_time)
 		suspend_wake_time = msm_pm_sleep_time_override;
 	else
 		suspend_wake_time = wakeup_time;
-	pr_info("ZTE_ALARM gonna sleep for %llu s, override: %d\n", suspend_wake_time, msm_pm_sleep_time_override);
 }
 EXPORT_SYMBOL(lpm_suspend_wake_time);
 
