@@ -696,4 +696,10 @@ static inline int soc_class_is_msm8974(void)
 	       cpu_is_msm8974pro_ab() || cpu_is_msm8974pro_ac();
 }
 
+/*
+ * zte_pm Support for PV mode for hall
+ */
+void socinfo_set_pv_flag(int val);
+int socinfo_get_pv_flag(void);
+
 #endif

@@ -1592,6 +1592,8 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 							int current_ma)
 {
 	int rc = 0;
+	enum power_supply_type usb_supply_type;
+	char *usb_type_name = "null";
 
 	/*
 	 * if the battery is not present, do not allow the usb ICL to lower in
@@ -1611,6 +1613,13 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 		goto out;
 	} else {
 		rc = vote(chip->usb_suspend_votable, USB_EN_VOTER, false, 0);
+	}
+
+	read_usb_type(chip, &usb_type_name, &usb_supply_type);
+	if (usb_supply_type == POWER_SUPPLY_TYPE_USB) {
+		if ((current_ma > CURRENT_150_MA) && (current_ma !=  CURRENT_500_MA)
+			&& (current_ma !=  CURRENT_900_MA))
+			current_ma = CURRENT_500_MA;
 	}
 
 	switch (chip->usb_supply_type) {

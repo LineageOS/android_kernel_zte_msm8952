@@ -566,8 +566,8 @@ static void goodix_ts_work_func(struct work_struct *work)
 			GTP_READ_COOR_ADDR & 0xFF};
 	u8	touch_num = 0;
 	u8	finger = 0;
-	u16 pre_touch = 0;
-	u8 pre_key = 0;
+	static u16 pre_touch = 0;
+	static u8 pre_key = 0;
 #if GTP_WITH_PEN
 	u8 pen_active = 0;
 	u8 pre_pen = 0;

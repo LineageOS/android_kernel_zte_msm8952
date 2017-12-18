@@ -1515,3 +1515,16 @@ const int cpu_is_krait_v3(void)
 		return 0;
 	};
 }
+
+/*zte_pm add code for pv version*/
+static int pv_flag;
+
+void socinfo_set_pv_flag(int val)
+{
+	pv_flag = val;
+}
+
+int socinfo_get_pv_flag(void)
+{
+	return pv_flag;
+}

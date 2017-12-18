@@ -89,6 +89,26 @@ static void print_boot_stats(void)
 		mpm_counter_freq);
 }
 
+#ifdef CONFIG_ZTE_BOOT_MODE
+/*zte_pm add code for pv version*/
+#define SOCINFO_CMDLINE_PV_FLAG "androidboot.pv-version="
+#define SOCINFO_CMDLINE_PV_VERSION "1"
+#define SOCINFO_CMDLINE_NON_PV_VERSION "0"
+static int __init zte_pv_flag_init(char *ver)
+{
+	int is_pv_ver = 0;
+
+	if (!strncmp(ver, SOCINFO_CMDLINE_PV_VERSION,
+				strlen(SOCINFO_CMDLINE_PV_VERSION)))
+		is_pv_ver = 1;
+
+	pr_info("pv flag: %d ", is_pv_ver);
+	socinfo_set_pv_flag(is_pv_ver);
+	return 0;
+}
+__setup(SOCINFO_CMDLINE_PV_FLAG, zte_pv_flag_init);
+#endif
+
 /*
  * Support for FTM & RECOVERY mode by ZTE_BOOT
  */

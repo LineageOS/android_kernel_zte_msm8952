@@ -315,6 +315,14 @@ static int32_t msm_flash_i2c_init(
 		settings = kzalloc(sizeof(
 			struct msm_camera_i2c_reg_setting_array), GFP_KERNEL);
 		if (!settings) {
+
+/*
+ * Fixed CWE-404, Resource leak(RESOURCE_LEAK), checked by Coverity
+ */
+#ifdef CONFIG_COMPAT
+			kfree(power_setting_array32);
+#endif
+
 			pr_err("%s mem allocation failed %d\n",
 				__func__, __LINE__);
 			return -ENOMEM;
@@ -323,6 +331,14 @@ static int32_t msm_flash_i2c_init(
 		if (copy_from_user(settings, (void *)flash_init_info->settings,
 			sizeof(struct msm_camera_i2c_reg_setting_array))) {
 			kfree(settings);
+
+/*
+ * Fixed CWE-404, Resource leak(RESOURCE_LEAK), checked by Coverity
+ */
+#ifdef CONFIG_COMPAT
+			kfree(power_setting_array32);
+#endif
+
 			pr_err("%s copy_from_user failed %d\n",
 				__func__, __LINE__);
 			return -EFAULT;
@@ -340,6 +356,14 @@ static int32_t msm_flash_i2c_init(
 	return 0;
 
 msm_flash_i2c_init_fail:
+
+/*
+ * Fixed CWE-404, Resource leak(RESOURCE_LEAK), checked by Coverity
+*/
+#ifdef CONFIG_COMPAT
+	kfree(power_setting_array32);
+#endif
+
 	return rc;
 }
 
