@@ -87,8 +87,6 @@ MODULE_ALIAS("mmc:block");
 #define PCKD_TRGR_URGENT_PENALTY	2
 #define PCKD_TRGR_LOWER_BOUND		5
 #define PCKD_TRGR_PRECISION_MULTIPLIER	100
-/* Set system device to ro if it was write protected */
-#define MAX_PARTION_NUMBER  128
 
 static struct mmc_cmdq_req *mmc_cmdq_prep_dcmd(
 		struct mmc_queue_req *mqrq, struct mmc_queue *mq);
@@ -109,7 +107,6 @@ static int max_devices;
 /* 256 minors, so at most 256 separate devices */
 static DECLARE_BITMAP(dev_use, 256);
 static DECLARE_BITMAP(name_use, 256);
-#define RECOVERY_MODE_STR "androidboot.mode=recovery"
 
 /*
  * There is one mmc_blk_data per slot.
@@ -151,7 +148,6 @@ struct mmc_blk_data {
 	struct device_attribute bkops_check_threshold;
 	struct device_attribute no_pack_for_random;
 	int	area_type;
-	int writeprotected_status;
 };
 
 static DEFINE_MUTEX(open_lock);
@@ -293,64 +289,6 @@ static ssize_t power_ro_lock_store(struct device *dev,
 	return count;
 }
 
-/* Set system device to ro if it was write protected */
-
-#define CMD31_SEND_WRITE_PROT_TYPE 31
-#define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))
-static int
-get_emmc_wp_status(struct mmc_card *card, unsigned int addr, void *buf)
-{
-	struct mmc_request mrq = {NULL};
-	struct mmc_command cmd = {0};
-	struct mmc_data data = {0};
-	struct scatterlist sg;
-	void *data_buf;
-
-	unsigned int wp_grp_size;
-
-	pr_info("get_emmc_wp_status()::e, addr=%d\n", addr);
-
-	/* dma onto stack is unsafe/nonportable, but callers to this
-	 * routine normally provide temporary on-stack buffers ...
-	 */
-	data_buf = kmalloc(8, GFP_KERNEL);
-	if (data_buf == NULL)
-		return -ENOMEM;
-
-	mrq.cmd = &cmd;
-	mrq.data = &data;
-
-	cmd.opcode = CMD31_SEND_WRITE_PROT_TYPE;
-	wp_grp_size = card->ext_csd.raw_hc_erase_gap_size * (card->ext_csd.hc_erase_size);
-	cmd.arg = ROUNDUP(addr, wp_grp_size);
-	pr_info("get_emmc_wp_status()::e, wp_grp_size=%d, addr=%d, cmd.arg=%d\n", wp_grp_size, addr, cmd.arg);
-
-
-	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
-
-	data.blksz = 8;
-	data.blocks = 1;
-	data.flags = MMC_DATA_READ;
-	data.sg = &sg;
-	data.sg_len = 1;
-
-	sg_init_one(&sg, data_buf, 8);
-
-	mmc_set_data_timeout(&data, card);
-
-	mmc_wait_for_req(card->host, &mrq);
-
-	memcpy(buf, data_buf, 8);
-	kfree(data_buf);
-
-	if (cmd.error)
-		return cmd.error;
-	if (data.error)
-		return data.error;
-	pr_info("get_emmc_wp_status()::x\n");
-
-	return 0;
-}
 static ssize_t force_ro_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
@@ -4296,106 +4234,6 @@ static const struct mmc_fixup blk_fixups[] =
 
 	END_FIXUP
 };
-/* Add for blkdev_ioctl to get the write protected status */
-int is_writeprotected(struct block_device *bdev)
-{
-	struct mmc_blk_data *md;
-
-	md = mmc_blk_get(bdev->bd_disk);
-	if (!md) {
-		return -EINVAL;
-	}
-	return md->writeprotected_status;
-}
-EXPORT_SYMBOL(is_writeprotected);
-
-#define POWER_ON_WP_STATUS 0x2
-
-void set_partition_ro(struct mmc_card *card, struct mmc_blk_data *md, const char *partition, int mergerd_num)
-{
-	static int i = 1;
-	int j;
-	struct hd_struct *p;
-	struct hd_struct *p_next;
-	unsigned char wp_status_buf[8];
-
-	memset(wp_status_buf, 0, 8);
-
-	for (/*i = 1*/; i < MAX_PARTION_NUMBER; i++) {
-
-		p = disk_get_part(md->disk, i);
-		if (p) {
-			if (p->info && p->info->volname[0]) {
-				if (!strcmp(partition, "GPT") && i == 1) {
-					get_emmc_wp_status(card, 0, wp_status_buf);
-				} else if (!strcmp(p->info->volname, partition)) {
-					get_emmc_wp_status(card, p->start_sect, wp_status_buf);
-				} else {
-					disk_put_part(p);
-					continue;
-				}
-
-				pr_info("set_partition_ro()::e, wp_status_buf[7]=0x%x\n", wp_status_buf[7]);
-				if ((wp_status_buf[7] & 0x3) == POWER_ON_WP_STATUS) { /* "10" */
-					p->policy = 1;
-					md->writeprotected_status = 1;
-				} else {
-					disk_put_part(p);
-					break;
-				}
-
-				for (j = 1; j < mergerd_num; j++) {
-					p_next = disk_get_part(md->disk, (i + j));
-					if (p_next)
-						p_next->policy = 1;
-					disk_put_part(p_next);
-				}
-				i += j;
-				disk_put_part(p);
-				break;
-			}
-		}
-		disk_put_part(p);
-	}
-
-}
-void do_set_partition_ro(struct mmc_card *card, struct mmc_blk_data *md)
-{
-	int err;
-
-	mmc_rpm_hold(card->host, &card->dev);
-	mmc_claim_host(card->host);
-
-	if (mmc_card_cmdq(card)) {
-		err = mmc_cmdq_halt_on_empty_queue(card->host);
-		if (err) {
-			pr_err("%s: halt failed while doing %s err (%d)\n", mmc_hostname(card->host), __func__, err);
-			goto out_free_halt;
-		}
-	}
-	/* The write protected partions are according to aboot,
-	 * the GPT is not in the partition table but also to be considered
-	 * attention:maybe the GPT is permanent WP and the sbl1 is power on WP,
-	 * so set_partition_ro() need call from the first partition but not GPT
-	 */
-	if (strnstr(saved_command_line, RECOVERY_MODE_STR, sizeof(saved_command_line))) {
-		set_partition_ro(card, md, "fsg", 1);
-	} else {
-		 /*sbl1+DDR+rpm+tz+hyp+fsg+sec+dsp+ztelk+devinfo+splash+echarge */
-		set_partition_ro(card, md, "sbl1", 12);
-		set_partition_ro(card, md, "aboot", 4); /*aboot+modem+boot+recovery */
-		set_partition_ro(card, md, "system", 1);
-	}
-
-	if (mmc_card_cmdq(card)) {
-		if (mmc_cmdq_halt(card->host, false))
-			pr_err("%s: %s: cmdq unhalt failed\n", mmc_hostname(card->host), __func__);
-	}
-
-out_free_halt:
-	mmc_release_host(card->host);
-	mmc_rpm_release(card->host, &card->dev);
-}
 static int mmc_blk_probe(struct mmc_card *card)
 {
 	struct mmc_blk_data *md, *part_md;
@@ -4434,10 +4272,6 @@ static int mmc_blk_probe(struct mmc_card *card)
 	list_for_each_entry(part_md, &md->part, part) {
 		if (mmc_add_disk(part_md))
 			goto out;
-	}
-	/*Set system device to ro if it was write protected */
-	if (mmc_card_mmc(card)) {
-		do_set_partition_ro(card, md);
 	}
 	return 0;
 
