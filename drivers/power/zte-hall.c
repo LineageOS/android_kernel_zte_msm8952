@@ -20,10 +20,15 @@
 /*for pv-version check*/
 #include <soc/qcom/socinfo.h>
 
+struct hall_pwrkey {
+	struct input_dev *hall_pwr;
+};
+
 suspend_state_t new_state_backup = PM_SUSPEND_ON;
 static int factory_mode;
 int hall_state_factorymode = 0;
 int hall_current_factory_mode = 0;
+struct hall_pwrkey *hallpwrkey;
 
 struct wake_lock hall_wake_lock;
 #define HALL_WAKELOCK_TIMEOUT 14
@@ -142,6 +147,8 @@ static void update_hall_state_by_work(struct work_struct *work)
 	envp[1] = NULL;
 
 	hallstate = open ? HALL_STATE_OPEN : HALL_STATE_CLOSE;
+	input_report_switch(hallpwrkey->hall_pwr, SW_LID, hallstate - 1);
+	input_sync(hallpwrkey->hall_pwr);
 	if (!hall_current_factory_mode) {
 		pr_info("ZTE_PM_HALL by work hall_detect_high_interrupt:hall %s\n",
 					open ? "open" : "close");
@@ -227,6 +234,7 @@ static int  zte_hall_probe(struct platform_device *pdev)
 	int err;
 	int rc = 0;
 	struct device *dev = &pdev->dev;
+	struct input_dev *hall_pwr;
 
 	pm_hall_dev = &pdev->dev;
 	pr_info("%s +++++\n", __func__);
@@ -235,8 +243,32 @@ static int  zte_hall_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
+	hallpwrkey = kzalloc(sizeof(*hallpwrkey), GFP_KERNEL);
+	if (!hallpwrkey) {
+		pr_info("Failed to alloc hallpwrkey\n");
+		return -ENOMEM;
+	}
+
 	gpio_hall_en = get_hall_sysnumber_byname(HALL_EN);
 	if (gpio_hall_en) {
+		hall_pwr = input_allocate_device();
+		if (!hall_pwr) {
+			pr_info("Failed to alloc hall input device\n");
+			err = -ENOMEM;
+			goto free_pwrkey;
+		}
+		set_bit(EV_SW, hall_pwr->evbit);
+		input_set_capability(hall_pwr, EV_KEY, KEY_POWER);
+		input_set_capability(hall_pwr, EV_SW, SW_LID);
+		err = input_register_device(hall_pwr);
+		if (err) {
+			pr_info("Failed to register hall device\n");
+			goto free_input_dev;
+		}
+		hall_pwr->name = "hall_imitate_pwrkey";
+		hall_pwr->phys = "hall_imitate_pwrkey/input0";
+		hallpwrkey->hall_pwr = hall_pwr;
+
 		wake_lock_init(&hall_wake_lock, WAKE_LOCK_SUSPEND,
 					hall_dev_name[0]);
 		rc = set_hall_gpio_state(dev);
@@ -269,6 +301,11 @@ static int  zte_hall_probe(struct platform_device *pdev)
 	}
 
 	return 0;
+free_input_dev:
+	input_free_device(hall_pwr);
+free_pwrkey:
+	kfree(hallpwrkey);
+	return err;
 }
 
 static int  zte_hall_remove(struct platform_device *pdev)
